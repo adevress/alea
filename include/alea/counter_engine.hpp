@@ -53,10 +53,6 @@
 ///
 ///  available cbrng backend  are : threefy
 ///
-///
-///
-///
-
 
 #include <random>
 

@@ -28,14 +28,11 @@
  */
 
 
-
+#include <chrono>
+#include <random>
+#include <iostream>
 
 #include <boost/test/floating_point_comparison.hpp>
-
-
-#include <chrono>
-#include <boost/random.hpp>
-
 #include <alea/random.hpp>
 
 
@@ -46,233 +43,170 @@ typedef system_clock cl;
 
 
 template<typename Duration>
-auto time_in_milliseconds(Duration duration){
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+auto time_in_microseconds(Duration duration){
+    return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
 }
 
-std::size_t test_random_mersenne_twister(std::size_t iter) {
+std::uint64_t test_random_mersenne_twister(std::uint64_t iter) {
 
-    std::size_t res = 0;
+    std::uint64_t res = 0;
 
     tp t1, t2;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
-    boost::random::mt19937 twister_engine;
+    std::uniform_int_distribution<std::uint64_t> dist;
+    std::mt19937 twister_engine;
 
     t1 = cl::now();
 
-    for (std::size_t i = 0; i < iter; ++i) {
+    for (std::uint64_t i = 0; i < iter; ++i) {
         res += dist(twister_engine);
     }
 
 
     t2 = cl::now();
 
-    std::cout << "mersenne_twister: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << std::endl;
+    std::cout << "mersenne_twister: " << time_in_microseconds(t2 - t1) << std::endl;
     return res;
 }
 
-/*
-std::size_t test_random_abstract_mersenne_twister(std::size_t iter) {
 
 
+std::uint64_t test_random_mersenne_twister64(std::uint64_t iter) {
 
-    std::size_t res = 0;
+    std::uint64_t res = 0;
 
     tp t1, t2;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
-    boost::random::mt19937 twister_engine;
-    alea::random_engine_mapper_32 abstract_engine(std::move(twister_engine));
+    std::uniform_int_distribution<std::uint64_t> dist;
+    std::mt19937_64 twister_engine;
 
     t1 = cl::now();
 
-    for (std::size_t i = 0; i < iter; ++i) {
-        res += dist(abstract_engine);
+    for (std::uint64_t i = 0; i < iter; ++i) {
+        res += dist(twister_engine);
     }
 
 
     t2 = cl::now();
 
-    std::cout << "abstract_mersenne_twister: " << boost::chrono::duration_cast<milliseconds>(t2 - t1) << std::endl;
+    std::cout << "mersenne_twister64: " << time_in_microseconds(t2 - t1)<< std::endl;
     return res;
-}*/
+}
 
 
+std::uint64_t test_random_ranlux(std::uint64_t iter) {
 
-
-std::size_t test_random_ranlux(std::size_t iter) {
-
-
-
-    std::size_t res = 0;
+    std::uint64_t res = 0;
 
     tp t1, t2;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
-    boost::random::ranlux24 ranlux_engine;
+    std::uniform_int_distribution<std::uint64_t> dist;
+    std::ranlux24 ranlux_engine;
 
     t1 = cl::now();
 
-    for (std::size_t i = 0; i < iter; ++i) {
+    for (std::uint64_t i = 0; i < iter; ++i) {
         res += dist(ranlux_engine);
     }
 
 
     t2 = cl::now();
 
-    std::cout << "ranlux: " << time_in_milliseconds(t2 - t1) << std::endl;
+    std::cout << "ranlux: " << time_in_microseconds(t2 - t1) << std::endl;
     return res;
 }
 
 
-/*
-
-std::size_t test_random_abstract_ranlux(std::size_t iter) {
+std::uint64_t test_random_minstd_rand(std::uint64_t iter) {
 
 
 
-    std::size_t res = 0;
+    std::uint64_t res = 0;
 
     tp t1, t2;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
-    boost::random::ranlux24 ranlux_engine;
-    alea::random_engine_mapper_32 abstract_engine(std::move(ranlux_engine));
+    std::uniform_int_distribution<std::uint64_t> dist;
+    std::minstd_rand mstd_engine;
 
     t1 = cl::now();
 
-    for (std::size_t i = 0; i < iter; ++i) {
-        res += dist(abstract_engine);
+    for (std::uint64_t i = 0; i < iter; ++i) {
+        res += dist(mstd_engine);
     }
 
 
     t2 = cl::now();
 
-    std::cout << "abstract_ranlux: " << boost::chrono::duration_cast<milliseconds>(t2 - t1) << std::endl;
-    return res;
-}*/
-
-
-std::size_t test_random_tau88(std::size_t iter) {
-
-
-
-    std::size_t res = 0;
-
-    tp t1, t2;
-
-    boost::random::uniform_int_distribution<std::size_t> dist;
-    boost::random::taus88 tau_engine;
-
-    t1 = cl::now();
-
-    for (std::size_t i = 0; i < iter; ++i) {
-        res += dist(tau_engine);
-    }
-
-
-    t2 = cl::now();
-
-    std::cout << "tau88: " << time_in_milliseconds(t2 - t1) << std::endl;
+    std::cout << "minstd: " << time_in_microseconds(t2 - t1) << std::endl;
     return res;
 }
 
 
+std::uint64_t test_random_threefry4x64(std::uint64_t iter) {
 
-/*
-std::size_t test_random_abstract_tau88(std::size_t iter) {
-
-
-
-    std::size_t res = 0;
+    std::uint64_t res = 0;
 
     tp t1, t2;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
-    boost::random::taus88 tau_engine;
-    alea::random_engine_mapper_32 abstract_engine(std::move(tau_engine));
-
-    t1 = cl::now();
-
-    for (std::size_t i = 0; i < iter; ++i) {
-        res += dist(abstract_engine);
-    }
-
-
-    t2 = cl::now();
-
-    std::cout << "abstract_tau88: " << boost::chrono::duration_cast<milliseconds>(t2 - t1) << std::endl;
-    return res;
-}
-
-
-
-std::size_t test_random_abstract_threefry(std::size_t iter) {
-
-    std::size_t res = 0;
-
-    tp t1, t2;
-
-    boost::random::uniform_int_distribution<std::size_t> dist;
-    alea::counter_engine<alea::threefry4x64> threefry_engine;
-    alea::random_engine_mapper_64 abstract_engine(std::move(threefry_engine));
-
-    t1 = cl::now();
-
-    for (std::size_t i = 0; i < iter; ++i) {
-        res += dist(abstract_engine);
-    }
-
-
-    t2 = cl::now();
-
-    std::cout << "abstract_threefry: " << boost::chrono::duration_cast<milliseconds>(t2 - t1) << std::endl;
-    return res;
-}*/
-
-
-std::size_t test_random_threefry(std::size_t iter) {
-
-    std::size_t res = 0;
-
-    tp t1, t2;
-
-    boost::random::uniform_int_distribution<std::size_t> dist;
+    std::uniform_int_distribution<std::uint64_t> dist;
 
     alea::counter_engine<alea::threefry4x64> threefry_engine;
 
     t1 = cl::now();
 
-    for (std::size_t i = 0; i < iter; ++i) {
+    for (std::uint64_t i = 0; i < iter; ++i) {
         res += dist(threefry_engine);
     }
 
-
     t2 = cl::now();
 
-    std::cout << "threefry: " << time_in_milliseconds(t2 - t1) << std::endl;
+    std::cout << "threefry4x64: " << time_in_microseconds(t2 - t1) << std::endl;
     return res;
 }
 
-std::size_t test_random_threefry_block_fake(std::size_t iter) {
 
-    std::size_t res = 0;
+
+std::uint64_t test_random_threefry2x64(std::uint64_t iter) {
+
+    std::uint64_t res = 0;
 
     tp t1, t2;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
+    std::uniform_int_distribution<std::uint64_t> dist;
+
+    alea::counter_engine<alea::threefry2x64> threefry_engine;
+
+    t1 = cl::now();
+
+    for (std::uint64_t i = 0; i < iter; ++i) {
+        res += dist(threefry_engine);
+    }
+
+    t2 = cl::now();
+
+    std::cout << "threefry2x64: " << time_in_microseconds(t2 - t1) << std::endl;
+    return res;
+}
+
+
+std::uint64_t test_random_threefry_block_fake(std::uint64_t iter) {
+
+    std::uint64_t res = 0;
+
+    tp t1, t2;
+
+    std::uniform_int_distribution<std::uint64_t> dist;
 
     alea::counter_engine<alea::threefry4x64> threefry_engine;
 
     t1 = cl::now();
 
-    const std::size_t size_block =
-        sizeof(typename alea::counter_engine<alea::threefry4x64>::ctr_type) / sizeof(std::size_t);
+    const std::uint64_t size_block =
+        sizeof(typename alea::counter_engine<alea::threefry4x64>::ctr_type) / sizeof(std::uint64_t);
 
-    for (std::size_t i = 0; i < (iter / size_block); ++i) {
+    for (std::uint64_t i = 0; i < iter; ++i) {
         auto block = threefry_engine.generate_block();
-        for (std::size_t i = 0; i < size_block; ++i) {
+        for (std::uint64_t i = 0; i < size_block; ++i) {
             res += block[0];
         }
     }
@@ -280,15 +214,15 @@ std::size_t test_random_threefry_block_fake(std::size_t iter) {
 
     t2 = cl::now();
 
-    std::cout << "threefry block gen: " << time_in_milliseconds(t2 - t1) << std::endl;
+    std::cout << "threefry block gen: " << time_in_microseconds(t2 - t1) << std::endl;
     return res;
 }
 
 
 int main() {
 
-    const std::size_t n_exec = 10000000;
-    std::size_t junk = 0;
+    const std::uint64_t n_exec = 10000000;
+    std::uint64_t junk = 0;
 
     std::cout << "generation of " << n_exec << " random numbers" << std::endl;
 
@@ -296,12 +230,13 @@ int main() {
 
     junk += test_random_ranlux(n_exec);
 
+    junk += test_random_mersenne_twister64(n_exec);
 
-    junk += test_random_tau88(n_exec);
+    junk += test_random_minstd_rand(n_exec);
 
+    junk += test_random_threefry4x64(n_exec);
 
-    junk += test_random_threefry(n_exec);
-
+    junk += test_random_threefry2x64(n_exec);
 
     junk += test_random_threefry_block_fake(n_exec);
 

@@ -39,7 +39,7 @@
 
 
 BOOST_AUTO_TEST_CASE(simple_random_tests) {
-    const std::size_t n_vals = 1000;
+    const std::uint64_t n_vals = 1000;
 
     std::mt19937 twister_engine;
 
@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(simple_random_tests) {
 
     // simple silly test to fullfill original twister
     // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
+    for (std::uint64_t i = 0; i < n_vals; ++i) {
         const int v = dist(twister_engine);
         origin_values.push_back(v);
         BOOST_CHECK_GE(v, 0);
@@ -65,7 +65,7 @@ BOOST_AUTO_TEST_CASE(simple_random_tests) {
 
     // simple silly test to fullfill original twister
     // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
+    for (std::uint64_t i = 0; i < n_vals; ++i) {
         const int v = dist(engine_mapper);
         mapper_values.push_back(v);
         BOOST_CHECK_GE(v, 0);
@@ -78,11 +78,11 @@ BOOST_AUTO_TEST_CASE(simple_random_tests) {
 
 
 BOOST_AUTO_TEST_CASE(simple_derivate) {
-    const std::size_t n_vals = 1000;
+    const std::uint64_t n_vals = 1000;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
+    boost::random::uniform_int_distribution<std::uint64_t> dist;
 
-    std::vector<std::size_t> origin_values, derivated_values;
+    std::vector<std::uint64_t> origin_values, derivated_values;
     origin_values.reserve(n_vals);
 
 
@@ -99,7 +99,7 @@ BOOST_AUTO_TEST_CASE(simple_derivate) {
 
     // simple silly test to fullfill original twister
     // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
+    for (std::uint64_t i = 0; i < n_vals; ++i) {
         unsigned int v1 = dist(engine_mapper);
         origin_values.push_back(v1);
 
@@ -116,11 +116,11 @@ BOOST_AUTO_TEST_CASE(simple_derivate) {
 
 
 BOOST_AUTO_TEST_CASE(determinism_derivate) {
-    const std::size_t n_vals = 1000;
+    const std::uint64_t n_vals = 1000;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
+    boost::random::uniform_int_distribution<std::uint64_t> dist;
 
-    std::vector<std::size_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
+    std::vector<std::uint64_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
     origin_values.reserve(n_vals);
 
 
@@ -142,7 +142,7 @@ BOOST_AUTO_TEST_CASE(determinism_derivate) {
 
     // simple silly test to fullfill original twister
     // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
+    for (std::uint64_t i = 0; i < n_vals; ++i) {
         unsigned int v1 = dist(engine_mapper);
         origin_values.push_back(v1);
 
@@ -172,11 +172,11 @@ BOOST_AUTO_TEST_CASE(determinism_derivate) {
 
 
 BOOST_AUTO_TEST_CASE(derivate_counter_based_determinism) {
-    const std::size_t n_vals = 1000;
+    const std::uint64_t n_vals = 1000;
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
+    boost::random::uniform_int_distribution<std::uint64_t> dist;
 
-    std::vector<std::size_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
+    std::vector<std::uint64_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
     origin_values.reserve(n_vals);
 
 
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(derivate_counter_based_determinism) {
 
     // simple silly test to fullfill original twister
     // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
+    for (std::uint64_t i = 0; i < n_vals; ++i) {
         unsigned int v1 = dist(engine_counter);
         origin_values.push_back(v1);
 
@@ -227,15 +227,15 @@ BOOST_AUTO_TEST_CASE(derivate_counter_based_determinism) {
 
 BOOST_AUTO_TEST_CASE(threefry_basic_32) {
 
-    std::size_t iter = 1001;
-    std::size_t res = 0;
+    std::uint64_t iter = 1001;
+    std::uint64_t res = 0;
 
 
     boost::random::uniform_int_distribution<boost::uint64_t> dist;
 
     alea::counter_engine<alea::threefry2x32> threefry_engine;
 
-    for (std::size_t i = 0; i < iter; ++i) {
+    for (std::uint64_t i = 0; i < iter; ++i) {
         const boost::uint64_t v = dist(threefry_engine);
         std::cout << "threefry_value: " << i << " " << v << "\n";
 
@@ -261,15 +261,15 @@ BOOST_AUTO_TEST_CASE(threefry_basic_32) {
 
 BOOST_AUTO_TEST_CASE(threefry_basic_64) {
 
-    std::size_t iter = 1001;
-    std::size_t res = 0;
+    std::uint64_t iter = 1001;
+    std::uint64_t res = 0;
 
 
     boost::random::uniform_int_distribution<boost::uint64_t> dist;
 
     alea::counter_engine<alea::threefry4x64> threefry_engine;
 
-    for (std::size_t i = 0; i < iter; ++i) {
+    for (std::uint64_t i = 0; i < iter; ++i) {
         const boost::uint64_t v = dist(threefry_engine);
         std::cout << "threefry_value: " << i << " " << v << "\n";
 
@@ -301,13 +301,13 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(threefry_distribute, T, threefry_types) {
 
     alea::counter_engine<T> threefry_engine;
 
-    const std::size_t n_normalize = 100000;
-    std::size_t res = 0;
-    for (std::size_t i = 0; i < n_normalize; ++i) {
+    const std::uint64_t n_normalize = 100000;
+    std::uint64_t res = 0;
+    for (std::uint64_t i = 0; i < n_normalize; ++i) {
         res += dist100(threefry_engine);
     }
 
-    const std::size_t mean = res / n_normalize;
+    const std::uint64_t mean = res / n_normalize;
     std::cout << "n_normalize_threefry: " << mean << "\n";
     BOOST_CHECK_GE(mean, 49);
     BOOST_CHECK_LE(mean, 51);
@@ -343,14 +343,14 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
     // discard and verify result with 1 by 1 inc
     {
         alea::counter_engine<T> threefry_engine, threefry_engine_clone;
-        const std::size_t inc_n = 1000;
+        const std::uint64_t inc_n = 1000;
 
         threefry_engine.seed(42);
         threefry_engine_clone.seed(42);
 
-        std::size_t junk = 0;
+        std::uint64_t junk = 0;
 
-        for (std::size_t i = 0; i < inc_n; ++i) {
+        for (std::uint64_t i = 0; i < inc_n; ++i) {
             junk += threefry_engine();
         }
 
@@ -364,14 +364,14 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
     //  same again but with prime number, to test discard by undivisible (size(elem))
     {
         alea::counter_engine<T> threefry_engine, threefry_engine_clone;
-        const std::size_t inc_n = 1181;
+        const std::uint64_t inc_n = 1181;
 
         threefry_engine.seed(42);
         threefry_engine_clone.seed(42);
 
-        std::size_t junk = 0;
+        std::uint64_t junk = 0;
 
-        for (std::size_t i = 0; i < inc_n; ++i) {
+        for (std::uint64_t i = 0; i < inc_n; ++i) {
             junk += threefry_engine();
         }
 
@@ -398,7 +398,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
         // discard and verify result with 1 by 1 inc
         boost::uintmax_t max_val = std::numeric_limits<boost::uintmax_t>::max();
 
-        const std::size_t factor = 50;
+        const std::uint64_t factor = 50;
         boost::uintmax_t small_inc = max_val / 16 / factor;
         boost::uintmax_t big_inc = small_inc * factor;
 
@@ -406,7 +406,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
         BOOST_CHECK_EQUAL(big_inc, small_inc * factor);
 
 
-        for (std::size_t i = 0; i < factor; ++i) {
+        for (std::uint64_t i = 0; i < factor; ++i) {
             threefry_engine.discard(small_inc);
         }
         threefry_engine_clone.discard(big_inc);

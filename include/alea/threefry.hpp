@@ -163,19 +163,19 @@ template <typename Uint>
 /// Performance gain evaluated to x4 on Intel I7 compared to a loop version
 ///
 
-template <std::size_t r_remain, std::size_t r_max, typename Uint, typename Domain, typename Constants, std::size_t N>
+template <std::uint64_t r_remain, std::uint64_t r_max, typename Uint, typename Domain, typename Constants, std::uint64_t N>
 struct rounds_functor {
     static_assert(N == 2 || N == 4, "number of rounds should be 2 or 4");
 };
 
-template <std::size_t r_remain, std::size_t r_max, typename Uint, typename Domain, typename Constants>
+template <std::uint64_t r_remain, std::uint64_t r_max, typename Uint, typename Domain, typename Constants>
 struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 4> {
     typedef Uint uint_type;
     typedef Domain domain_type;
 
 
     inline void operator()(const utils::array<uint_type, 5>& ks, domain_type& c) {
-        constexpr std::size_t r = r_max - r_remain;
+        constexpr std::uint64_t r = r_max - r_remain;
 
         if constexpr ((r & 0x01)) {
             c[0] += c[3];
@@ -183,9 +183,9 @@ struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 4> {
             c[3] = threefry_rotl(c[3], Constants::rotations0(r)) ^ c[0];
             c[1] = threefry_rotl(c[1], Constants::rotations1(r)) ^ c[2];
 
-            constexpr std::size_t r_next = r + 1;
-            constexpr std::size_t r4 = r_next >> 2;
-            constexpr std::size_t r_next_mod_4 = r_next % 4;
+            constexpr std::uint64_t r_next = r + 1;
+            constexpr std::uint64_t r4 = r_next >> 2;
+            constexpr std::uint64_t r_next_mod_4 = r_next % 4;
 
             if constexpr (r_next_mod_4 == 0) {
                 c[0] += ks[(r4 + 0) % 5];
@@ -206,7 +206,7 @@ struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 4> {
     }
 };
 
-template <std::size_t r_max, typename Uint, typename Domain, typename Constants>
+template <std::uint64_t r_max, typename Uint, typename Domain, typename Constants>
 struct rounds_functor<0, r_max, Uint, Domain, Constants, 4> {
     typedef Uint uint_type;
     typedef Domain domain_type;
@@ -219,22 +219,22 @@ struct rounds_functor<0, r_max, Uint, Domain, Constants, 4> {
 };
 
 
-template <std::size_t r_remain, std::size_t r_max, typename Uint, typename Domain, typename Constants>
+template <std::uint64_t r_remain, std::uint64_t r_max, typename Uint, typename Domain, typename Constants>
 struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 2> {
     typedef Uint uint_type;
     typedef Domain domain_type;
 
 
     inline void operator()(const utils::array<uint_type, 3>& ks, domain_type& c) {
-        constexpr std::size_t r = r_max - r_remain;
+        constexpr std::uint64_t r = r_max - r_remain;
 
         c[0] += c[1];
         c[1] = threefry_rotl(c[1], Constants::rotations(r));
         c[1] ^= c[0];
 
-        constexpr std::size_t r_next = r + 1;
-        constexpr std::size_t r4 = r_next >> 2;
-        constexpr std::size_t r_next_mod_4 = r_next % 4;
+        constexpr std::uint64_t r_next = r + 1;
+        constexpr std::uint64_t r4 = r_next >> 2;
+        constexpr std::uint64_t r_next_mod_4 = r_next % 4;
 
         if constexpr(r_next_mod_4 == 0) {
             c[0] += ks[r4 % 3];
@@ -248,7 +248,7 @@ struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 2> {
 };
 
 
-template <std::size_t r_max, typename Uint, typename Domain, typename Constants>
+template <std::uint64_t r_max, typename Uint, typename Domain, typename Constants>
 struct rounds_functor<0, r_max, Uint, Domain, Constants, 2> {
     typedef Uint uint_type;
     typedef Domain domain_type;

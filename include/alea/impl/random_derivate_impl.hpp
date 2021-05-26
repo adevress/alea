@@ -86,8 +86,8 @@ inline Engine random_engine_derivate(const Engine& engine, const typename Engine
     for (alea::sha1::digest32_t::iterator it = digest.begin(); it < digest.end(); ++it) {
 
         std::bitset<32> bits(*it);
-        const std::size_t iteration = bits.count();
-        for (std::size_t i = 0; i < iteration; ++i) {
+        const std::uint64_t iteration = bits.count();
+        for (std::uint64_t i = 0; i < iteration; ++i) {
             (void)res();
         }
     }*/

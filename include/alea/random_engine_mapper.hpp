@@ -29,23 +29,19 @@
 #ifndef _ALEA_RANDOM_ENGINE_MAPPER_HPP_
 #define _ALEA_RANDOM_ENGINE_MAPPER_HPP_
 
-
 #include <algorithm>
+#include <boost/integer.hpp>
+#include <boost/random.hpp>
 #include <cassert>
 #include <memory>
 #include <vector>
-
-#include <boost/integer.hpp>
-#include <boost/random.hpp>
 
 namespace alea {
 
 // internals
 namespace impl {
-template <typename Uint>
-class abstract_engine;
+template <typename Uint> class abstract_engine;
 }
-
 
 ///
 /// runtime abstraction layer for the C++11 / boost.Random
@@ -55,8 +51,7 @@ class abstract_engine;
 /// interface at runtime
 ///
 ///
-template <typename Uint>
-class random_engine_mapper {
+template <typename Uint> class random_engine_mapper {
   public:
     typedef Uint result_type;
 
@@ -67,13 +62,11 @@ class random_engine_mapper {
     /// map a specialized random generator in the C++11 / boost format
     ///  to a generic random_engine_mapper that can be used in any distribution
     ///
-    template <typename Engine>
-    explicit random_engine_mapper(Engine&& intern);
+    template <typename Engine> explicit random_engine_mapper(Engine &&intern);
 
-    random_engine_mapper(random_engine_mapper&& other);
+    random_engine_mapper(random_engine_mapper &&other);
 
-    random_engine_mapper& operator=(random_engine_mapper&&);
-
+    random_engine_mapper &operator=(random_engine_mapper &&);
 
     /// reset to defautl seed, mapping
     inline void seed();
@@ -90,8 +83,10 @@ class random_engine_mapper {
     ///
     ///  The derivation respect the following rules
     ///  - The operation is always deterministic for a given key and seed
-    ///  - The new random engine do not have statistical correlation with the old one
-    ///  - Two different keys, even close in range guarantee two independent random streams
+    ///  - The new random engine do not have statistical correlation with the
+    ///  old one
+    ///  - Two different keys, even close in range guarantee two independent
+    ///  random streams
     ///
     ///
     random_engine_mapper derivate(result_type key) const;
@@ -107,27 +102,23 @@ class random_engine_mapper {
   private:
     std::unique_ptr<impl::abstract_engine<result_type>> _engine;
 
-    random_engine_mapper(const random_engine_mapper& other) = delete;
+    random_engine_mapper(const random_engine_mapper &other) = delete;
 
-    random_engine_mapper& operator=(const random_engine_mapper& other) = delete;
+    random_engine_mapper &operator=(const random_engine_mapper &other) = delete;
 };
-
 
 typedef random_engine_mapper<boost::uint32_t> random_engine_mapper_32;
 typedef random_engine_mapper<boost::uint64_t> random_engine_mapper_64;
-
-
-
 
 // specialize random_engine_derivate
 // for random mapper
 
 template <typename Uint>
-inline random_engine_mapper<Uint> random_engine_derivate(const random_engine_mapper<Uint>& engine,
-                                                         const typename random_engine_mapper<Uint>::result_type& key) {
+inline random_engine_mapper<Uint> random_engine_derivate(
+    const random_engine_mapper<Uint> &engine,
+    const typename random_engine_mapper<Uint>::result_type &key) {
     return engine.derivate(key);
 }
-
 
 } // namespace alea
 

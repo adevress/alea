@@ -29,12 +29,7 @@
 #ifndef _ALEA_RANDOM_HPP_
 #define _ALEA_RANDOM_HPP_
 
-
-
-
 #include "counter_engine.hpp"
 #include "threefry.hpp"
-
-
 
 #endif // _ALEA_RANDOM_HPP_

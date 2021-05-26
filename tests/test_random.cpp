@@ -29,14 +29,11 @@
 #define BOOST_TEST_MODULE randomTests
 #define BOOST_TEST_MAIN
 
+#include <alea/random.hpp>
+#include <alea/random_engine_mapper.hpp>
 #include <boost/mpl/list.hpp>
 #include <boost/test/floating_point_comparison.hpp>
 #include <boost/test/unit_test.hpp>
-
-
-#include <alea/random.hpp>
-#include <alea/random_engine_mapper.hpp>
-
 
 BOOST_AUTO_TEST_CASE(simple_random_tests) {
     const std::uint64_t n_vals = 1000;
@@ -58,7 +55,8 @@ BOOST_AUTO_TEST_CASE(simple_random_tests) {
     }
 
     std::mt19937 twister_engine_clone;
-    alea::random_engine_mapper_32 engine_mapper(std::move(twister_engine_clone));
+    alea::random_engine_mapper_32 engine_mapper(
+        std::move(twister_engine_clone));
 
     std::vector<int> mapper_values;
     mapper_values.reserve(n_vals);
@@ -72,10 +70,9 @@ BOOST_AUTO_TEST_CASE(simple_random_tests) {
         BOOST_CHECK_LE(v, n_vals);
     }
 
-    BOOST_CHECK_EQUAL_COLLECTIONS(origin_values.begin(), origin_values.end(), mapper_values.begin(), mapper_values.end());
+    BOOST_CHECK_EQUAL_COLLECTIONS(origin_values.begin(), origin_values.end(),
+                                  mapper_values.begin(), mapper_values.end());
 }
-
-
 
 BOOST_AUTO_TEST_CASE(simple_derivate) {
     const std::uint64_t n_vals = 1000;
@@ -85,17 +82,14 @@ BOOST_AUTO_TEST_CASE(simple_derivate) {
     std::vector<std::uint64_t> origin_values, derivated_values;
     origin_values.reserve(n_vals);
 
-
-
     const int seed = 424242;
     boost::random::mt11213b twister_engine_clone;
-    alea::random_engine_mapper_32 engine_mapper(std::move(twister_engine_clone));
+    alea::random_engine_mapper_32 engine_mapper(
+        std::move(twister_engine_clone));
     engine_mapper.seed(seed);
-
 
     // create a derivation with a terrible seed init difference  1
     alea::random_engine_mapper_32 derivated_engine = engine_mapper.derivate(1);
-
 
     // simple silly test to fullfill original twister
     // random generator vector
@@ -112,33 +106,30 @@ BOOST_AUTO_TEST_CASE(simple_derivate) {
     }
 }
 
-
-
-
 BOOST_AUTO_TEST_CASE(determinism_derivate) {
     const std::uint64_t n_vals = 1000;
 
     boost::random::uniform_int_distribution<std::uint64_t> dist;
 
-    std::vector<std::uint64_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
+    std::vector<std::uint64_t> origin_values, derivated_values,
+        derivated_values_same, derivated_values_differ;
     origin_values.reserve(n_vals);
-
 
     const int seed = 1234;
     boost::random::mt11213b twister_engine_clone;
-    alea::random_engine_mapper_32 engine_mapper(std::move(twister_engine_clone));
+    alea::random_engine_mapper_32 engine_mapper(
+        std::move(twister_engine_clone));
     engine_mapper.seed(seed);
 
-
-
-    // create two derivation with the same key, they should behave in the same way
+    // create two derivation with the same key, they should behave in the same
+    // way
     alea::random_engine_mapper_32 derivated_engine = engine_mapper.derivate(42);
-    alea::random_engine_mapper_32 derivated_engine_same = engine_mapper.derivate(42);
+    alea::random_engine_mapper_32 derivated_engine_same =
+        engine_mapper.derivate(42);
 
     // create a second one as double derivative as reference
-    alea::random_engine_mapper_32 derivated_engine_differ = derivated_engine_same.derivate(43);
-
-
+    alea::random_engine_mapper_32 derivated_engine_differ =
+        derivated_engine_same.derivate(43);
 
     // simple silly test to fullfill original twister
     // random generator vector
@@ -155,7 +146,6 @@ BOOST_AUTO_TEST_CASE(determinism_derivate) {
         unsigned int v4 = dist(derivated_engine_differ);
         derivated_values_differ.push_back(v4);
 
-
         BOOST_CHECK_NE(v1, v2);
         BOOST_CHECK_NE(v1, v3);
         BOOST_CHECK_NE(v1, v4);
@@ -165,35 +155,34 @@ BOOST_AUTO_TEST_CASE(determinism_derivate) {
         BOOST_CHECK_NE(v2, v4);
         BOOST_CHECK_NE(v2, v4);
 
-        std::cout << "randum_num_diff: " << v1 << " " << v2 << " " << v3 << " " << v4 << "\n";
+        std::cout << "randum_num_diff: " << v1 << " " << v2 << " " << v3 << " "
+                  << v4 << "\n";
     }
 }
-
-
 
 BOOST_AUTO_TEST_CASE(derivate_counter_based_determinism) {
     const std::uint64_t n_vals = 1000;
 
     boost::random::uniform_int_distribution<std::uint64_t> dist;
 
-    std::vector<std::uint64_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
+    std::vector<std::uint64_t> origin_values, derivated_values,
+        derivated_values_same, derivated_values_differ;
     origin_values.reserve(n_vals);
-
 
     const int seed = 1234;
     alea::counter_engine<alea::threefry4x64> engine_counter;
     engine_counter.seed(seed);
 
-
-
-    // create two derivation with the same key, they should behave in the same way
-    alea::counter_engine<alea::threefry4x64> derivated_engine = engine_counter.derivate(42);
-    alea::counter_engine<alea::threefry4x64> derivated_engine_same = engine_counter.derivate(42);
+    // create two derivation with the same key, they should behave in the same
+    // way
+    alea::counter_engine<alea::threefry4x64> derivated_engine =
+        engine_counter.derivate(42);
+    alea::counter_engine<alea::threefry4x64> derivated_engine_same =
+        engine_counter.derivate(42);
 
     // create a second one as double derivative as reference
-    alea::counter_engine<alea::threefry4x64> derivated_engine_differ = derivated_engine_same.derivate(43);
-
-
+    alea::counter_engine<alea::threefry4x64> derivated_engine_differ =
+        derivated_engine_same.derivate(43);
 
     // simple silly test to fullfill original twister
     // random generator vector
@@ -210,7 +199,6 @@ BOOST_AUTO_TEST_CASE(derivate_counter_based_determinism) {
         unsigned int v4 = dist(derivated_engine_differ);
         derivated_values_differ.push_back(v4);
 
-
         BOOST_CHECK_NE(v1, v2);
         BOOST_CHECK_NE(v1, v3);
         BOOST_CHECK_NE(v1, v4);
@@ -220,16 +208,14 @@ BOOST_AUTO_TEST_CASE(derivate_counter_based_determinism) {
         BOOST_CHECK_NE(v2, v4);
         BOOST_CHECK_NE(v2, v4);
 
-        std::cout << "randum_num_diff: " << v1 << " " << v2 << " " << v3 << " " << v4 << "\n";
+        std::cout << "randum_num_diff: " << v1 << " " << v2 << " " << v3 << " "
+                  << v4 << "\n";
     }
 }
 
-
 BOOST_AUTO_TEST_CASE(threefry_basic_32) {
-
     std::uint64_t iter = 1001;
     std::uint64_t res = 0;
-
 
     boost::random::uniform_int_distribution<boost::uint64_t> dist;
 
@@ -241,29 +227,31 @@ BOOST_AUTO_TEST_CASE(threefry_basic_32) {
 
         switch (i) {
         case 0: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(5804853139360071474ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(5804853139360071474ULL));
         } break;
         case 10: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(7053101028938294423ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(7053101028938294423ULL));
         } break;
         case 100: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(12524329080125684850ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(12524329080125684850ULL));
         } break;
         case 1000: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(8534186729197965889ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(8534186729197965889ULL));
         } break;
-        default: {}
+        default: {
+        }
         }
         res += v;
     }
 }
 
-
 BOOST_AUTO_TEST_CASE(threefry_basic_64) {
-
     std::uint64_t iter = 1001;
     std::uint64_t res = 0;
-
 
     boost::random::uniform_int_distribution<boost::uint64_t> dist;
 
@@ -275,25 +263,30 @@ BOOST_AUTO_TEST_CASE(threefry_basic_64) {
 
         switch (i) {
         case 0: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(12180738260140386403ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(12180738260140386403ULL));
         } break;
         case 10: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(15340443714481834838ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(15340443714481834838ULL));
         } break;
         case 100: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(6790623761552653118ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(6790623761552653118ULL));
         } break;
         case 1000: {
-            BOOST_CHECK_EQUAL(v, static_cast<boost::uint64_t>(16214960538048011ULL));
+            BOOST_CHECK_EQUAL(
+                v, static_cast<boost::uint64_t>(16214960538048011ULL));
         } break;
-        default: {}
+        default: {
+        }
         }
         res += v;
     }
 }
 
-
-typedef boost::mpl::list<alea::threefry2x32, alea::threefry4x32, alea::threefry2x64, alea::threefry4x64>
+typedef boost::mpl::list<alea::threefry2x32, alea::threefry4x32,
+                         alea::threefry2x64, alea::threefry4x64>
     threefry_types;
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(threefry_distribute, T, threefry_types) {
@@ -313,15 +306,11 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(threefry_distribute, T, threefry_types) {
     BOOST_CHECK_LE(mean, 51);
 }
 
-
-
-
 BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
-
     // basic consistency test
     {
-
-        alea::counter_engine<T> threefry_engine, threefry_engine_origin, threefry_engine_clone;
+        alea::counter_engine<T> threefry_engine, threefry_engine_origin,
+            threefry_engine_clone;
 
         threefry_engine.seed(42);
         threefry_engine_origin.seed(42);
@@ -330,15 +319,14 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
         threefry_engine_clone.discard(100);
         threefry_engine_origin.discard(0);
 
-
-        typename alea::counter_engine<T>::result_type res = threefry_engine(), res_origin = threefry_engine_origin(),
-                                                         res_clone = threefry_engine_clone();
-
+        typename alea::counter_engine<T>::result_type
+            res = threefry_engine(),
+            res_origin = threefry_engine_origin(),
+            res_clone = threefry_engine_clone();
 
         BOOST_CHECK_NE(res, res_clone);
         BOOST_CHECK_EQUAL(res, res_origin);
     }
-
 
     // discard and verify result with 1 by 1 inc
     {
@@ -359,9 +347,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
         BOOST_CHECK_EQUAL(threefry_engine(), threefry_engine_clone());
     }
 
-
-
-    //  same again but with prime number, to test discard by undivisible (size(elem))
+    //  same again but with prime number, to test discard by undivisible
+    //  (size(elem))
     {
         alea::counter_engine<T> threefry_engine, threefry_engine_clone;
         const std::uint64_t inc_n = 1181;
@@ -382,18 +369,17 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
 
     // test increment that overflow a normal 32 buffers
     {
-
         alea::counter_engine<T> threefry_engine, threefry_engine_clone;
 
         threefry_engine.seed(42);
         threefry_engine_clone.seed(42);
 
-
         typename alea::counter_engine<T>::ctr_type ctr, ctr_clone;
         ctr = threefry_engine.getcounter();
         ctr_clone = threefry_engine_clone.getcounter();
 
-        BOOST_CHECK_EQUAL_COLLECTIONS(ctr.begin(), ctr.end(), ctr_clone.begin(), ctr_clone.end());
+        BOOST_CHECK_EQUAL_COLLECTIONS(ctr.begin(), ctr.end(), ctr_clone.begin(),
+                                      ctr_clone.end());
 
         // discard and verify result with 1 by 1 inc
         boost::uintmax_t max_val = std::numeric_limits<boost::uintmax_t>::max();
@@ -402,9 +388,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
         boost::uintmax_t small_inc = max_val / 16 / factor;
         boost::uintmax_t big_inc = small_inc * factor;
 
-
         BOOST_CHECK_EQUAL(big_inc, small_inc * factor);
-
 
         for (std::uint64_t i = 0; i < factor; ++i) {
             threefry_engine.discard(small_inc);
@@ -414,7 +398,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
         ctr = threefry_engine.getcounter();
         ctr_clone = threefry_engine_clone.getcounter();
 
-        BOOST_CHECK_EQUAL_COLLECTIONS(ctr.begin(), ctr.end(), ctr_clone.begin(), ctr_clone.end());
+        BOOST_CHECK_EQUAL_COLLECTIONS(ctr.begin(), ctr.end(), ctr_clone.begin(),
+                                      ctr_clone.end());
 
         BOOST_CHECK_EQUAL(threefry_engine(), threefry_engine_clone());
     }

@@ -30,12 +30,11 @@
 #ifndef RANDOM_DERIVATE_HPP
 #define RANDOM_DERIVATE_HPP
 
-
 namespace alea {
 
 template <typename Engine>
-inline Engine random_engine_derivate(const Engine& engine, const typename Engine::result_type& key);
-
+inline Engine random_engine_derivate(const Engine &engine,
+                                     const typename Engine::result_type &key);
 
 }
 

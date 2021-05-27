@@ -1,0 +1,29 @@
+name: Ubuntu build
+
+on: [push, pull_request]
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [g++, clang++]
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Install Deps
+      run: sudo apt install -y cmake ninja-build clang g++ libboost-all-dev
+    
+    - name: Configure Phase
+      env:
+        CXX: ${{ matrix.compiler }}
+      run: mkdir build; cd build; cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ../;
+
+    - name: Build Phase
+      run: pwd; cd build; ninja -v
+
+    - name: Test Phase
+      run: cd build; ctest -V
+

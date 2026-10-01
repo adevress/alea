@@ -1,0 +1,65 @@
+---
+version: '3'
+
+vars:
+  # same style as the .clang-format file at the root of the repository
+  BUILD_DIR: build
+  CLANG_FORMAT: clang-format
+
+tasks:
+  default:
+    desc: list the available tasks
+    cmds:
+      - task --list-all
+
+  format:
+    desc: format all the C++ sources and headers of the project
+    sources:
+      - '**/*.hpp'
+      - '**/*.cpp'
+      - .clang-format
+    excludes:
+      - third_party/**
+      - build/**
+      - 'build-*/**'
+    cmds:
+      - git ls-files -z '*.hpp' '*.cpp' | xargs -0 -r {{.CLANG_FORMAT}} -i --style=file
+      - git ls-files --others --exclude-standard -z '*.hpp' '*.cpp' | xargs -r -0 {{.CLANG_FORMAT}} -i --style=file
+
+  format-check:
+    desc: check the formatting of the C++ sources without modifying them
+    cmds:
+      - git ls-files -z '*.hpp' '*.cpp' | xargs -0 -r {{.CLANG_FORMAT}} -n --Werror --style=file
+      - git ls-files --others --exclude-standard -z '*.hpp' '*.cpp' | xargs -r -0 {{.CLANG_FORMAT}} -n
+        --Werror --style=file
+
+  configure:
+    desc: configure the project with cmake and ninja
+    cmds:
+      - cmake -G Ninja -S . -B {{.BUILD_DIR}}
+
+  build:
+    desc: configure and build the project and its tests
+    deps:
+      - configure
+    cmds:
+      - cmake --build {{.BUILD_DIR}}
+
+  test:
+    desc: build and run the unit tests
+    deps:
+      - build
+    cmds:
+      - cd {{.BUILD_DIR}} && ctest -V
+
+  bench:
+    desc: run the nanobench based benchmarks
+    deps:
+      - build
+    cmds:
+      - ./{{.BUILD_DIR}}/ALEA_Bench
+
+  clean:
+    desc: remove the build directories
+    cmds:
+      - rm -rf build build-agent

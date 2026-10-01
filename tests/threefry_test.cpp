@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016, Adrien Devresse <adrien.devresse@epfl.ch>
+ * Copyright (c) 2026, Adrien Devresse <adev@adev.name>
  *
  * Boost Software License - Version 1.0
  *
@@ -30,375 +30,353 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 
+#include <cstdint>
+#include <limits>
 #include <random>
+#include <sstream>
+#include <type_traits>
 
+#include "alea/random.hpp"
 
-#include <alea/random.hpp>
+//
+// the threefry generators must be usable in constant expressions: this also
+// checks at compile time that the cipher is deterministic and stateless
+//
 
+static_assert(alea::threefry4x64{}(alea::threefry4x64::domain_type{1, 2, 3, 4})[0] == 14276687134489684560ULL);
+static_assert(alea::threefry2x32{}(alea::threefry2x32::domain_type{1, 2})[1] == 3131650755U);
 
-TEST_CASE("simple_random_tests") {
-    const std::size_t n_vals = 1000;
+TEST_CASE("threefry golden values, 32 bits") {
+  SUBCASE("threefry2x32") {
+    alea::threefry2x32 cipher;
+    const auto block = cipher(alea::threefry2x32::domain_type{1, 2});
+    CHECK_EQ(block[0], 1390163619U);
+    CHECK_EQ(block[1], 3131650755U);
+    static_assert(std::is_same_v<alea::threefry2x32::uint_type, std::uint32_t>, "threefry2x32 must use 32 bit words");
+  }
 
-    std::mt19937_64 twister_engine;
-
-    std::uniform_int_distribution<int> dist(0, n_vals);
-
-    std::vector<int> origin_values;
-    origin_values.reserve(n_vals);
-
-    // simple silly test to fullfill original twister
-    // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
-        const int v = dist(twister_engine);
-        origin_values.push_back(v);
-        CHECK_GE(v, 0);
-        CHECK_LE(v, n_vals);
-    }
-
+  SUBCASE("threefry4x32") {
+    alea::threefry4x32 cipher;
+    const auto block = cipher(alea::threefry4x32::domain_type{1, 2, 3, 4});
+    CHECK_EQ(block[0], 3493051854U);
+    CHECK_EQ(block[1], 2581483932U);
+    CHECK_EQ(block[2], 998428297U);
+    CHECK_EQ(block[3], 2429851283U);
+  }
 }
 
+TEST_CASE("threefry golden values, 64 bits") {
+  SUBCASE("threefry2x64") {
+    alea::threefry2x64 cipher;
+    const auto block = cipher(alea::threefry2x64::domain_type{1, 2});
+    CHECK_EQ(block[0], 3797989197207778043ULL);
+    CHECK_EQ(block[1], 9805594228365740645ULL);
+  }
 
-/*
-AUTO_TEST_CASE(simple_derivate) {
-    const std::size_t n_vals = 1000;
+  SUBCASE("threefry4x64") {
+    alea::threefry4x64 cipher;
+    const auto block = cipher(alea::threefry4x64::domain_type{1, 2, 3, 4});
+    CHECK_EQ(block[0], 14276687134489684560ULL);
+    CHECK_EQ(block[1], 12958816754744280892ULL);
+    CHECK_EQ(block[2], 17894100595138145301ULL);
+    CHECK_EQ(block[3], 1013103230217800475ULL);
+  }
 
-    boost::random::uniform_int_distribution<std::size_t> dist;
-
-    std::vector<std::size_t> origin_values, derivated_values;
-    origin_values.reserve(n_vals);
-
-
-
-    const int seed = 424242;
-    boost::random::mt11213b twister_engine_clone;
-    hadoken::random_engine_mapper_32 engine_mapper(std::move(twister_engine_clone));
-    engine_mapper.seed(seed);
-
-
-    // create a derivation with a terrible seed init difference  1
-    hadoken::random_engine_mapper_32 derivated_engine = engine_mapper.derivate(1);
-
-
-    // simple silly test to fullfill original twister
-    // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
-        unsigned int v1 = dist(engine_mapper);
-        origin_values.push_back(v1);
-
-        unsigned int v2 = dist(derivated_engine);
-        derivated_values.push_back(v2);
-
-        std::cout << "random_num_twins: " << v1 << " " << v2 << std::endl;
-
-        CHECK_NE(v1, v2);
-    }
+  SUBCASE("threefry_default is threefry4x64") {
+    static_assert(std::is_same_v<alea::threefry_default, alea::threefry4x64>,
+                  "the default generator must be threefry4x64");
+    static_assert(std::is_same_v<alea::threefry_default::uint_type, std::uint64_t>,
+                  "the default generator must use 64 bit words");
+    CHECK(true);
+  }
 }
 
+TEST_CASE("counter_engine golden stream, 32 bits") {
+  alea::counter_engine<alea::threefry2x32> engine;
+  std::uint64_t val = 0;
 
-
-
-AUTO_TEST_CASE(determinism_derivate) {
-    const std::size_t n_vals = 1000;
-
-    boost::random::uniform_int_distribution<std::size_t> dist;
-
-    std::vector<std::size_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
-    origin_values.reserve(n_vals);
-
-
-    const int seed = 1234;
-    boost::random::mt11213b twister_engine_clone;
-    hadoken::random_engine_mapper_32 engine_mapper(std::move(twister_engine_clone));
-    engine_mapper.seed(seed);
-
-
-
-    // create two derivation with the same key, they should behave in the same way
-    hadoken::random_engine_mapper_32 derivated_engine = engine_mapper.derivate(42);
-    hadoken::random_engine_mapper_32 derivated_engine_same = engine_mapper.derivate(42);
-
-    // create a second one as double derivative as reference
-    hadoken::random_engine_mapper_32 derivated_engine_differ = derivated_engine_same.derivate(43);
-
-
-
-    // simple silly test to fullfill original twister
-    // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
-        unsigned int v1 = dist(engine_mapper);
-        origin_values.push_back(v1);
-
-        unsigned int v2 = dist(derivated_engine);
-        derivated_values.push_back(v2);
-
-        unsigned int v3 = dist(derivated_engine_same);
-        derivated_values_same.push_back(v3);
-
-        unsigned int v4 = dist(derivated_engine_differ);
-        derivated_values_differ.push_back(v4);
-
-
-        CHECK_NE(v1, v2);
-        CHECK_NE(v1, v3);
-        CHECK_NE(v1, v4);
-
-        CHECK_EQUAL(v2, v3);
-
-        CHECK_NE(v2, v4);
-        CHECK_NE(v2, v4);
-
-        std::cout << "randum_num_diff: " << v1 << " " << v2 << " " << v3 << " " << v4 << "\n";
+  for (int i = 0; i <= 1000; ++i) {
+    val = engine();
+    if (i == 0) {
+      CHECK_EQ(val, 3235790642U);
+    } else if (i == 10) {
+      CHECK_EQ(val, 2882477498U);
+    } else if (i == 100) {
+      CHECK_EQ(val, 1065648981U);
+    } else if (i == 1000) {
+      CHECK_EQ(val, 2548131963U);
     }
+  }
 }
 
+TEST_CASE("counter_engine golden stream, 64 bits") {
+  alea::counter_engine<alea::threefry4x64> engine;
+  std::uint64_t val = 0;
 
-
-AUTO_TEST_CASE(derivate_counter_based_determinism) {
-    const std::size_t n_vals = 1000;
-
-    boost::random::uniform_int_distribution<std::size_t> dist;
-
-    std::vector<std::size_t> origin_values, derivated_values, derivated_values_same, derivated_values_differ;
-    origin_values.reserve(n_vals);
-
-
-    const int seed = 1234;
-    hadoken::counter_engine<hadoken::threefry4x64> engine_counter;
-    engine_counter.seed(seed);
-
-
-
-    // create two derivation with the same key, they should behave in the same way
-    hadoken::counter_engine<hadoken::threefry4x64> derivated_engine = engine_counter.derivate(42);
-    hadoken::counter_engine<hadoken::threefry4x64> derivated_engine_same = engine_counter.derivate(42);
-
-    // create a second one as double derivative as reference
-    hadoken::counter_engine<hadoken::threefry4x64> derivated_engine_differ = derivated_engine_same.derivate(43);
-
-
-
-    // simple silly test to fullfill original twister
-    // random generator vector
-    for (std::size_t i = 0; i < n_vals; ++i) {
-        unsigned int v1 = dist(engine_counter);
-        origin_values.push_back(v1);
-
-        unsigned int v2 = dist(derivated_engine);
-        derivated_values.push_back(v2);
-
-        unsigned int v3 = dist(derivated_engine_same);
-        derivated_values_same.push_back(v3);
-
-        unsigned int v4 = dist(derivated_engine_differ);
-        derivated_values_differ.push_back(v4);
-
-
-        CHECK_NE(v1, v2);
-        CHECK_NE(v1, v3);
-        CHECK_NE(v1, v4);
-
-        CHECK_EQUAL(v2, v3);
-
-        CHECK_NE(v2, v4);
-        CHECK_NE(v2, v4);
-
-        std::cout << "randum_num_diff: " << v1 << " " << v2 << " " << v3 << " " << v4 << "\n";
+  // these values are the ones of the reference Random123 threefry4x64 stream
+  for (int i = 0; i <= 1000; ++i) {
+    val = engine();
+    if (i == 0) {
+      CHECK_EQ(val, 12180738260140386403ULL);
+    } else if (i == 10) {
+      CHECK_EQ(val, 15340443714481834838ULL);
+    } else if (i == 100) {
+      CHECK_EQ(val, 6790623761552653118ULL);
+    } else if (i == 1000) {
+      CHECK_EQ(val, 16214960538048011ULL);
     }
+  }
 }
 
+TEST_CASE_TEMPLATE("threefry api", Cbrng, alea::threefry2x32, alea::threefry4x32, alea::threefry2x64,
+                   alea::threefry4x64) {
+  using uint_type = typename Cbrng::uint_type;
+  using key_type = typename Cbrng::key_type;
+  using domain_type = typename Cbrng::domain_type;
 
-AUTO_TEST_CASE(threefry_basic_32) {
+  CHECK_EQ(Cbrng::number_of_rounds, 20U);
 
-    std::size_t iter = 1001;
-    std::size_t res = 0;
+  // the default key is made of zeros, and the generator is stateless
+  Cbrng default_cipher;
+  CHECK_EQ(default_cipher.get_key(), key_type{});
 
+  domain_type counter{};
+  for (std::size_t i = 0; i < counter.size(); ++i) {
+    counter[i] = static_cast<uint_type>(i + 1);
+  }
 
-    boost::random::uniform_int_distribution<boost::uint64_t> dist;
+  const auto first = default_cipher(counter);
+  const auto second = default_cipher(counter);
+  CHECK_EQ(first, second);
 
-    hadoken::counter_engine<hadoken::threefry2x32> threefry_engine;
+  // the key must be readable and updatable
+  key_type key{};
+  for (std::size_t i = 0; i < key.size(); ++i) {
+    key[i] = static_cast<uint_type>(0x0123456789ABCDEFULL);
+  }
+  default_cipher.set_key(key);
+  CHECK_EQ(default_cipher.get_key(), key);
 
-    for (std::size_t i = 0; i < iter; ++i) {
-        const boost::uint64_t v = dist(threefry_engine);
-        std::cout << "threefry_value: " << i << " " << v << "\n";
+  SUBCASE("equality is only based on the key") {
+    Cbrng other(key);
+    CHECK(default_cipher == other);
+    CHECK_FALSE(default_cipher != other);
 
-        switch (i) {
-        case 0: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(5804853139360071474ULL));
-        } break;
-        case 10: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(7053101028938294423ULL));
-        } break;
-        case 100: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(12524329080125684850ULL));
-        } break;
-        case 1000: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(8534186729197965889ULL));
-        } break;
-        default: {}
-        }
-        res += v;
+    other.set_key(key_type{});
+    CHECK(default_cipher != other);
+    CHECK_FALSE(default_cipher == other);
+  }
+
+  SUBCASE("different keys give different blocks") {
+    const auto with_key = default_cipher(counter);
+    const Cbrng cipher_zero_key;
+    const auto without_key = cipher_zero_key(counter);
+
+    std::size_t different_words = 0;
+    for (std::size_t i = 0; i < with_key.size(); ++i) {
+      different_words += (with_key[i] != without_key[i]) ? 1 : 0;
     }
+    CHECK_GT(different_words, 0);
+  }
+
+  SUBCASE("ciphers are copy and move constructible") {
+    const Cbrng copy(default_cipher);
+    const Cbrng moved(default_cipher);
+    CHECK(copy == default_cipher);
+    CHECK(moved == default_cipher);
+    CHECK_EQ(copy(counter), default_cipher(counter));
+  }
 }
 
+TEST_CASE_TEMPLATE("counter_engine api", Cbrng, alea::threefry2x32, alea::threefry4x32, alea::threefry2x64,
+                   alea::threefry4x64) {
+  using engine_type = alea::counter_engine<Cbrng>;
+  using result_type = typename engine_type::result_type;
+  using key_type = typename engine_type::key_type;
+  using ctr_type = typename engine_type::ctr_type;
 
-AUTO_TEST_CASE(threefry_basic_64) {
+  // engine requirements
+  static_assert(std::is_unsigned_v<result_type>, "the result type must be unsigned");
+  CHECK_EQ(engine_type::min(), static_cast<result_type>(0));
+  CHECK_EQ(engine_type::max(), std::numeric_limits<result_type>::max());
 
-    std::size_t iter = 1001;
-    std::size_t res = 0;
+  key_type key{};
+  for (std::size_t i = 0; i < key.size(); ++i) {
+    key[i] = static_cast<result_type>(i + 42);
+  }
 
+  SUBCASE("two engines with the same key give the same stream") {
+    engine_type first(key);
+    engine_type second;
+    second.seed(key);
 
-    boost::random::uniform_int_distribution<boost::uint64_t> dist;
-
-    hadoken::counter_engine<hadoken::threefry4x64> threefry_engine;
-
-    for (std::size_t i = 0; i < iter; ++i) {
-        const boost::uint64_t v = dist(threefry_engine);
-        std::cout << "threefry_value: " << i << " " << v << "\n";
-
-        switch (i) {
-        case 0: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(12180738260140386403ULL));
-        } break;
-        case 10: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(15340443714481834838ULL));
-        } break;
-        case 100: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(6790623761552653118ULL));
-        } break;
-        case 1000: {
-            CHECK_EQUAL(v, static_cast<boost::uint64_t>(16214960538048011ULL));
-        } break;
-        default: {}
-        }
-        res += v;
+    for (int i = 0; i < 1000; ++i) {
+      CHECK_EQ(first(), second());
     }
-}
+    CHECK(first == second);
+    CHECK_FALSE(first != second);
+  }
 
+  SUBCASE("two engines with different keys give independent streams") {
+    engine_type first(key);
+    key_type other_key = key;
+    other_key[0] = static_cast<result_type>(other_key[0] + 1);
+    engine_type second(other_key);
 
-typedef boost::mpl::list<hadoken::threefry2x32, hadoken::threefry4x32, hadoken::threefry2x64, hadoken::threefry4x64>
-    threefry_types;
+    std::size_t identical_values = 0;
+    for (int i = 0; i < 1000; ++i) {
+      identical_values += (first() == second()) ? 1 : 0;
+    }
+    CHECK_EQ(identical_values, 0);
+  }
 
-AUTO_TEST_CASE_TEMPLATE(threefry_distribute, T, threefry_types) {
-    boost::random::uniform_int_distribution<boost::uint64_t> dist100(0, 100);
+  SUBCASE("seed and get_key, get_counter") {
+    engine_type engine;
+    CHECK_EQ(engine.get_key(), key_type{});
+    CHECK_EQ(engine.get_counter(), ctr_type{});
 
-    hadoken::counter_engine<T> threefry_engine;
+    engine.seed(key);
+    CHECK_EQ(engine.get_key(), key);
 
+    engine.seed(static_cast<result_type>(1234));
+    key_type broadcasted{};
+    for (result_type& val : broadcasted) {
+      val = static_cast<result_type>(1234);
+    }
+    CHECK_EQ(engine.get_key(), broadcasted);
+
+    std::seed_seq seq{1, 2, 3, 4, 5, 6};
+    engine_type from_seq(seq);
+    CHECK_NE(engine.get_key(), from_seq.get_key());
+
+    // the counter moves forward once the whole block has been consumed
+    engine_type stepper(key);
+    const std::size_t block_size = stepper.get_counter().size();
+    for (std::size_t i = 0; i < block_size; ++i) {
+      (void)stepper();
+    }
+    CHECK_EQ(stepper.get_counter(), ctr_type{1});
+  }
+
+  SUBCASE("generate_block is the encryption of the incremented counter") {
+    engine_type engine(key);
+    const Cbrng cipher(key);
+    const ctr_type block = engine.generate_block();
+
+    ctr_type expected_ctr{};
+    expected_ctr[0] = 1;
+    CHECK_EQ(block, cipher(expected_ctr));
+    CHECK_EQ(engine.get_counter(), expected_ctr);
+  }
+
+  SUBCASE("operator() on a counter is a pure encryption") {
+    const engine_type engine(key);
+    ctr_type counter{};
+    for (std::size_t i = 0; i < counter.size(); ++i) {
+      counter[i] = static_cast<result_type>(7);
+    }
+
+    const Cbrng cipher(key);
+    CHECK_EQ(engine(counter), cipher(counter));
+    // the state of the engine is left untouched
+    CHECK_EQ(engine.get_counter(), ctr_type{});
+  }
+
+  SUBCASE("discard is consistent with consuming one by one") {
+    // discard(0) leaves the engine untouched
+    {
+      engine_type engine(key);
+      engine_type clone(key);
+      clone.discard(0);
+      CHECK_EQ(engine(), clone());
+    }
+
+    // a number of values divisible by the block size
+    {
+      engine_type engine(key);
+      engine_type clone(key);
+      for (int i = 0; i < 100; ++i) {
+        (void)engine();
+      }
+      clone.discard(100);
+      CHECK_EQ(engine(), clone());
+    }
+
+    // a prime number of values, not divisible by the block size
+    {
+      engine_type engine(key);
+      engine_type clone(key);
+      const std::size_t inc_n = 1181;
+      for (std::size_t i = 0; i < inc_n; ++i) {
+        (void)engine();
+      }
+      clone.discard(inc_n);
+      CHECK_EQ(engine(), clone());
+    }
+
+    // discarding inside the currently buffered block
+    {
+      engine_type engine(key);
+      engine_type clone(key);
+      (void)engine();
+      clone.discard(1);
+      CHECK_EQ(engine(), clone());
+    }
+  }
+
+  SUBCASE("discard supports increments larger than a 32 bit word") {
+    engine_type engine(key);
+    engine_type clone(key);
+
+    const std::uintmax_t max_val = std::numeric_limits<std::uintmax_t>::max();
+    const std::size_t factor = 50;
+    const std::uintmax_t small_inc = max_val / 16 / factor;
+    const std::uintmax_t big_inc = small_inc * factor;
+
+    for (std::size_t i = 0; i < factor; ++i) {
+      engine.discard(small_inc);
+    }
+    clone.discard(big_inc);
+
+    CHECK_EQ(engine.get_counter(), clone.get_counter());
+    CHECK_EQ(engine(), clone());
+  }
+
+  SUBCASE("engines are copy constructible and stream printable") {
+    engine_type engine(key);
+    for (int i = 0; i < 3; ++i) {
+      (void)engine();
+    }
+
+    const engine_type copy(engine);
+    CHECK(copy == engine);
+
+    std::ostringstream os;
+    os << engine;
+    CHECK_FALSE(os.str().empty());
+  }
+
+  SUBCASE("the engine is usable with the std distributions") {
+    std::uniform_int_distribution<result_type> int_dist(0, 100);
+    std::uniform_real_distribution<double> real_dist(0.0, 1.0);
+
+    engine_type engine(key);
+    std::uint64_t sum = 0;
     const std::size_t n_normalize = 100000;
-    std::size_t res = 0;
+
     for (std::size_t i = 0; i < n_normalize; ++i) {
-        res += dist100(threefry_engine);
+      const result_type val = int_dist(engine);
+      CHECK_GE(val, static_cast<result_type>(0));
+      CHECK_LE(val, static_cast<result_type>(100));
+      sum += val;
+
+      const double dval = real_dist(engine);
+      CHECK_GE(dval, 0.0);
+      CHECK_LE(dval, 1.0);
     }
 
-    const std::size_t mean = res / n_normalize;
-    std::cout << "n_normalize_threefry: " << mean << "\n";
+    const std::uint64_t mean = sum / n_normalize;
     CHECK_GE(mean, 49);
     CHECK_LE(mean, 51);
+  }
 }
-
-
-
-
-AUTO_TEST_CASE_TEMPLATE(engine_discard, T, threefry_types) {
-
-    // basic consistency test
-    {
-
-        hadoken::counter_engine<T> threefry_engine, threefry_engine_origin, threefry_engine_clone;
-
-        threefry_engine.seed(42);
-        threefry_engine_origin.seed(42);
-        threefry_engine_clone.seed(42);
-
-        threefry_engine_clone.discard(100);
-        threefry_engine_origin.discard(0);
-
-
-        typename hadoken::counter_engine<T>::result_type res = threefry_engine(), res_origin = threefry_engine_origin(),
-                                                         res_clone = threefry_engine_clone();
-
-
-        CHECK_NE(res, res_clone);
-        CHECK_EQUAL(res, res_origin);
-    }
-
-
-    // discard and verify result with 1 by 1 inc
-    {
-        hadoken::counter_engine<T> threefry_engine, threefry_engine_clone;
-        const std::size_t inc_n = 1000;
-
-        threefry_engine.seed(42);
-        threefry_engine_clone.seed(42);
-
-        std::size_t junk = 0;
-
-        for (std::size_t i = 0; i < inc_n; ++i) {
-            junk += threefry_engine();
-        }
-
-        threefry_engine_clone.discard(inc_n);
-
-        CHECK_EQUAL(threefry_engine(), threefry_engine_clone());
-    }
-
-
-
-    //  same again but with prime number, to test discard by undivisible (size(elem))
-    {
-        hadoken::counter_engine<T> threefry_engine, threefry_engine_clone;
-        const std::size_t inc_n = 1181;
-
-        threefry_engine.seed(42);
-        threefry_engine_clone.seed(42);
-
-        std::size_t junk = 0;
-
-        for (std::size_t i = 0; i < inc_n; ++i) {
-            junk += threefry_engine();
-        }
-
-        threefry_engine_clone.discard(inc_n);
-
-        CHECK_EQUAL(threefry_engine(), threefry_engine_clone());
-    }
-
-    // test increment that overflow a normal 32 buffers
-    {
-
-        hadoken::counter_engine<T> threefry_engine, threefry_engine_clone;
-
-        threefry_engine.seed(42);
-        threefry_engine_clone.seed(42);
-
-
-        typename hadoken::counter_engine<T>::ctr_type ctr, ctr_clone;
-        ctr = threefry_engine.getcounter();
-        ctr_clone = threefry_engine_clone.getcounter();
-
-        CHECK_EQUAL_COLLECTIONS(ctr.begin(), ctr.end(), ctr_clone.begin(), ctr_clone.end());
-
-        // discard and verify result with 1 by 1 inc
-        boost::uintmax_t max_val = std::numeric_limits<boost::uintmax_t>::max();
-
-        const std::size_t factor = 50;
-        boost::uintmax_t small_inc = max_val / 16 / factor;
-        boost::uintmax_t big_inc = small_inc * factor;
-
-
-        CHECK_EQUAL(big_inc, small_inc * factor);
-
-
-        for (std::size_t i = 0; i < factor; ++i) {
-            threefry_engine.discard(small_inc);
-        }
-        threefry_engine_clone.discard(big_inc);
-
-        ctr = threefry_engine.getcounter();
-        ctr_clone = threefry_engine_clone.getcounter();
-
-        CHECK_EQUAL_COLLECTIONS(ctr.begin(), ctr.end(), ctr_clone.begin(), ctr_clone.end());
-
-        CHECK_EQUAL(threefry_engine(), threefry_engine_clone());
-    }
-}
-*/

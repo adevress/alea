@@ -1,0 +1,7 @@
+prefix=${pcfiledir}/../..
+includedir=${prefix}/include
+
+Name: alea
+Description: Modern C++ counter based random number generators (CBRNGs), header only
+Version: @PROJECT_VERSION@
+Cflags: -I${includedir}

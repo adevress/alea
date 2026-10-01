@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024, Adrien Devresse <adev@adev.name>
+ * Copyright (c) 2026, Adrien Devresse <adev@adev.name>
  *
  * Boost Software License - Version 1.0
  *
@@ -24,330 +24,110 @@
  * FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
-*
-*/
+ *
+ */
+#pragma once
 
-
-//
-// This work is derivated from the boost.Random123
-// repository accessible here https://github.com/DEShawResearch/Random123-Boost
-//
-//
-
-#ifndef _HADOKEN_RANDOM_THREEFRY_
-#define _HADOKEN_RANDOM_THREEFRY_
-
-
-#include <cstdint>
-#include <numeric>
-#include <random>
-
-#include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 
+#include "alea/impl/threefry_impl.hpp"
 
-///
-///  threefry is a state-less counter base random generator
-///  derivated from the block cipher threefish
-///  part of the "The Skein Hash Function Family" by
-///   Niels Ferguson, Stefan Lucks, Bruce Schneier, Doug Whiting
-///   Mihir Bellare, Tadayoshi Kohno, Jon Callas, Jesse Walker (
-///
-///   threefry has been presented at SC11 in the publication
-///
-/// "Parallel random numbers: as easy as 1, 2, 3".
-///    John K. Salmon, Mark A. Moraes, Ron O. Dror, David E. Shaw" (doi:10.1145/2063384.2063405)
-///
-///  This implementation is freely inspired of Boost.Random123  (https://github.com/DEShawResearch/Random123-Boost )
-///
+//
+// This work is derivated from the Boost.Random123 repository available here
+// https://github.com/DEShawResearch/Random123-Boost
+//
 
 namespace alea {
 
-
-
-namespace utils {
-#ifdef HADOKEN_COMPILER_IS_NVCC
-using namespace gpu;
-#else
-using namespace std;
-#endif
-}; // namespace utils
-
-
-namespace impl {
-
-// threefry_constants is an abstract template that will be
-// specialized with the KS_PARITY and Rotation constants
-// of the threefry generators.  These constants are carefully
-// chosen to achieve good randomization.
-//  threefry_constants<2, uint32_t>
-//  threefry_constants<2, uint64_t>
-//  threefry_constants<4, uint32_t>
-//  threefry_constants<4, uint64_t>
-// The constants here are from Salmon et al <FIXME REF>.
-//
-// See Salmon et al, or Schneier's original work on Threefish <FIXME
-// REF> for information about how the constants were obtained.
-template <unsigned _N, typename Uint>
-struct threefry_constants {};
-
-// 2x32 constants
-template <>
-struct threefry_constants<2, uint32_t> {
-
-    
-    static constexpr int32_t ks_parity() { return UINT32_C(0x1BD11BDA); }
-
-    
-    static inline unsigned rotations(int pos) {
-        constexpr unsigned rotations[8] = {13, 15, 26, 6, 17, 29, 16, 24};
-        return rotations[pos];
-    }
-};
-
-
-// 4x32 contants
-template <>
-struct threefry_constants<4, uint32_t> {
-
-    
-    static constexpr int32_t ks_parity() { return UINT32_C(0x1BD11BDA); }
-
-    
-    static inline unsigned rotations0(int pos) {
-        constexpr unsigned rotations[8] = {10, 11, 13, 23, 6, 17, 25, 18};
-        return rotations[pos];
-    }
-
-    
-    static inline unsigned rotations1(int pos) {
-        constexpr unsigned rotations[8] = {26, 21, 27, 5, 20, 11, 10, 20};
-        return rotations[pos];
-    }
-};
-
-// 2x64 constants
-template <>
-struct threefry_constants<2, uint64_t> {
-    
-    static constexpr uint64_t ks_parity() { return UINT64_C(0x1BD11BDAA9FC1A22); }
-
-    static inline unsigned rotations(int pos) {
-        constexpr unsigned rotations[8] = {16, 42, 12, 31, 16, 32, 24, 21};
-        return rotations[pos];
-    }
-};
-
-
-
-// 4x64 constants
-template <>
-struct threefry_constants<4, uint64_t> {
-    
-    static constexpr uint64_t ks_parity() { return UINT64_C(0x1BD11BDAA9FC1A22); }
-
-    static inline unsigned rotations0(int pos) {
-        constexpr unsigned rotations[8] = {14, 52, 23, 5, 25, 46, 58, 32};
-        return rotations[pos];
-    }
-
-    static inline unsigned rotations1(int pos) {
-        constexpr unsigned rotations[8] = {16, 57, 40, 37, 33, 12, 22, 32};
-        return rotations[pos];
-    }
-};
-
-template <typename Uint>
- inline Uint threefry_rotl(Uint x, unsigned s) {
-    return (x << s) | (x >> (std::numeric_limits<Uint>::digits - s));
-}
-
-
-
-/// the number of rounds is known at compile time
-/// It allows us to use recursive partial template
-/// specialization and to avoid branching on conditions
+/// threefry is a state-less counter based random generator, derivated from the
+/// block cipher threefish, part of "The Skein Hash Function Family" by
+///   Niels Ferguson, Stefan Lucks, Bruce Schneier, Doug Whiting,
+///   Mihir Bellare, Tadayoshi Kohno, Jon Callas, Jesse Walker
 ///
-/// good compilers (GCC > 4.8, icc, clang ) transform this into
-/// a single function without branching
+/// threefry has been presented at SC11 in the publication
+///   "Parallel random numbers: as easy as 1, 2, 3".
+///    John K. Salmon, Mark A. Moraes, Ron O. Dror, David E. Shaw
+///    (doi:10.1145/2063384.2063405)
 ///
-/// we get a performance gain x4 on Intel I7 compared to a loop version
+/// This implementation is freely inspired by Boost.Random123
+/// (https://github.com/DEShawResearch/Random123-Boost)
 ///
-
-template <std::size_t r_remain, std::size_t r_max, typename Uint, typename Domain, typename Constants, std::size_t N>
-struct rounds_functor {
-    static_assert(N == 2 || N == 4, "number of rounds should be 2 or 4");
-};
-
-template <std::size_t r_remain, std::size_t r_max, typename Uint, typename Domain, typename Constants>
-struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 4> {
-    typedef Uint uint_type;
-    typedef Domain domain_type;
-
-    
-    inline void operator()(const utils::array<uint_type, 5>& ks, domain_type& c) {
-        constexpr std::size_t r = r_max - r_remain;
-
-        if ((r & 0x01)) {
-            c[0] += c[3];
-            c[2] += c[1];
-            c[3] = threefry_rotl(c[3], Constants::rotations0(r % 8)) ^ c[0];
-            c[1] = threefry_rotl(c[1], Constants::rotations1(r % 8)) ^ c[2];
-
-            const std::size_t r_next = r + 1;
-            const std::size_t r4 = r_next >> 2;
-            const std::size_t r_next_mod_4 = r_next % 4;
-
-            if (r_next_mod_4 == 0) {
-                c[0] += ks[(r4 + 0) % 5];
-                c[1] += ks[(r4 + 1) % 5];
-                c[2] += ks[(r4 + 2) % 5];
-                c[3] += ks[(r4 + 3) % 5] + r4;
-            }
-
-        } else {
-            c[0] += c[1];
-            c[2] += c[3];
-            c[1] = threefry_rotl(c[1], Constants::rotations0(r % 8)) ^ c[0];
-            c[3] = threefry_rotl(c[3], Constants::rotations1(r % 8)) ^ c[2];
-        }
-        rounds_functor<r_remain - 1, r_max, uint_type, domain_type, Constants, 4> func;
-        func(ks, c);
-        return;
-    }
-};
-
-template <std::size_t r_max, typename Uint, typename Domain, typename Constants>
-struct rounds_functor<0, r_max, Uint, Domain, Constants, 4> {
-    typedef Uint uint_type;
-    typedef Domain domain_type;
-
-    
-    inline void operator()(const utils::array<uint_type, 5>& ks, domain_type& c) {
-        (void)ks;
-        (void)c;
-    }
-};
-
-
-template <std::size_t r_remain, std::size_t r_max, typename Uint, typename Domain, typename Constants>
-struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 2> {
-    typedef Uint uint_type;
-    typedef Domain domain_type;
-
-    
-    inline void operator()(const utils::array<uint_type, 3>& ks, domain_type& c) {
-        constexpr std::size_t r = r_max - r_remain;
-
-        c[0] += c[1];
-        c[1] = threefry_rotl(c[1], Constants::rotations(r % 8));
-        c[1] ^= c[0];
-
-
-        constexpr std::size_t r_next = r + 1;
-        constexpr std::size_t r4 = r_next >> 2;
-        constexpr std::size_t r_next_mod_4 = r_next % 4;
-
-        if (r_next_mod_4 == 0) {
-            c[0] += ks[r4 % 3];
-            c[1] += ks[(r4 + 1) % 3] + r4;
-        }
-
-        rounds_functor<r_remain - 1, r_max, uint_type, domain_type, Constants, 2> func;
-        func(ks, c);
-        return;
-    }
-};
-
-
-template <std::size_t r_max, typename Uint, typename Domain, typename Constants>
-struct rounds_functor<0, r_max, Uint, Domain, Constants, 2> {
-    typedef Uint uint_type;
-    typedef Domain domain_type;
-
-    
-    inline void operator()(const utils::array<uint_type, 3>& ks, domain_type& c) {
-        (void)ks;
-        (void)c;
-    }
-};
-
-} // namespace impl
-
+/// \tparam N number of words of the counter and of the key, 2 or 4
+/// \tparam Uint unsigned integer type used for the words of the counter
+/// \tparam R number of rounds of the cipher, 20 by default
+/// \tparam Constants the parity and rotation constants of the generator
 template <unsigned N, typename Uint, unsigned R = 20, typename Constants = impl::threefry_constants<N, Uint>>
 class threefry {
-    static_assert(N == 2 || N == 4, "number of rounds should be 2 or 4");
+  static_assert(N == 2 || N == 4, "the number of words of the counter should be 2 or 4");
 
-  public:
-    typedef utils::array<Uint, N> domain_type;
-    typedef utils::array<Uint, N> range_type;
-    typedef utils::array<Uint, N> key_type;
-    typedef Uint uint_type;
+public:
+  using domain_type = std::array<Uint, N>;
+  using range_type = std::array<Uint, N>;
+  using key_type = std::array<Uint, N>;
+  using uint_type = Uint;
 
-    
-    explicit threefry() : k() {}
-    
-    explicit threefry(key_type _k) : k(_k) {}
+  /// number of rounds performed by the generator
+  static constexpr unsigned number_of_rounds = R;
 
-    
-    threefry(const threefry&) = default;
-    
-    threefry(threefry&&) = default;
+  /// construct a generator with a key set to zero
+  constexpr threefry() : k() {}
 
-    
-    threefry& operator=(const threefry&) = default;
-    
-    threefry& operator=(threefry&&) = default;
+  /// construct a generator with the key `new_key`
+  explicit constexpr threefry(key_type new_key) : k(new_key) {}
 
-    
-    void set_key(key_type _k) { k = _k; }
+  constexpr threefry(const threefry&) = default;
+  constexpr threefry(threefry&&) = default;
 
-    
-    key_type get_key() const { return k; }
+  threefry& operator=(const threefry&) = default;
+  threefry& operator=(threefry&&) = default;
 
-    
-    bool operator==(const threefry& rhs) const { return k == rhs.k; }
+  /// set the key of the generator
+  void set_key(key_type new_key) { k = new_key; }
 
-    
-    bool operator!=(const threefry& rhs) const { return k != rhs.k; }
+  /// get the key of the generator
+  key_type get_key() const { return k; }
 
+  bool operator==(const threefry& rhs) const { return k == rhs.k; }
 
-    
-    inline range_type operator()(const domain_type& counter) {
-        using namespace impl;
-        utils::array<uint_type, N + 1> ks;
-        domain_type c(counter);
+  bool operator!=(const threefry& rhs) const { return k != rhs.k; }
 
-        utils::copy(k.begin(), k.end(), ks.begin());
-        ks[N] = utils::accumulate(k.begin(), k.end(), Constants::ks_parity(), utils::bit_xor<uint_type>());
-        utils::transform(k.begin(), k.end(), c.begin(), c.begin(), utils::plus<uint_type>());
+  /// encrypt the counter `counter` with the current key of the generator
+  ///
+  /// the operation is stateless: the same (key, counter) pair always produces
+  /// the same block, whatever the number of times and the order of the calls.
+  constexpr range_type operator()(const domain_type& counter) const {
+    std::array<uint_type, N + 1> ks{};
+    domain_type c(counter);
 
-        rounds_functor<R, R, uint_type, domain_type, Constants, N> func;
-        func(ks, c);
-
-        return c;
+    // the schedule key ks is the key k extended with its parity
+    // (xor of all its words) mixed with the threefry KS parity constant
+    ks[N] = Constants::ks_parity();
+    for (std::size_t i = 0; i < N; ++i) {
+      ks[i] = k[i];
+      ks[N] ^= k[i];
+      c[i] += k[i];
     }
 
+    impl::rounds_functor<R, R, uint_type, domain_type, Constants, N> func;
+    func(ks, c);
 
-  private:
-    key_type k;
+    return c;
+  }
+
+private:
+  key_type k;
 };
 
+using threefry2x32 = threefry<2, std::uint32_t>;
+using threefry4x32 = threefry<4, std::uint32_t>;
 
+using threefry2x64 = threefry<2, std::uint64_t>;
+using threefry4x64 = threefry<4, std::uint64_t>;
 
+/// threefry4x64 is crush-resistant and the fastest one on most of the current
+/// platforms: it is the recommended default
+using threefry_default = threefry4x64;
 
-typedef threefry<4, std::uint64_t> threefry4x64;
-typedef threefry<2, std::uint64_t> threefry2x64;
-
-
-typedef threefry<4, std::uint32_t> threefry4x32;
-typedef threefry<2, std::uint32_t> threefry2x32;
-
-/// threefry4x64 is crush-resistant and the fastest one most
-/// of the current platforms: use it by default
-typedef threefry<4, std::uint64_t> threefry_default;
-
-
-} // namespace hadoken
-
-#endif // _HADOKEN_RANDOM_THREEFRY_
+} // namespace alea

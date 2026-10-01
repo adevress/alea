@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024, Adrien Devresse <adrien.devresse@epfl.ch>
+ * Copyright (c) 2026, Adrien Devresse <adev@adev.name>
  *
  * Boost Software License - Version 1.0
  *
@@ -26,15 +26,11 @@
  * DEALINGS IN THE SOFTWARE.
  *
  */
-#ifndef _HADOKEN_RANDOM_HPP_
-#define _HADOKEN_RANDOM_HPP_
+#pragma once
 
-
-
+//
+// umbrella header of the random generators of alea
+//
 
 #include "alea/counter_engine.hpp"
 #include "alea/threefry.hpp"
-
-
-
-#endif // _HADOKEN_RANDOM_HPP_

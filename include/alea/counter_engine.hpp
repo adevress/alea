@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024, Adrien Devresse <adrien.devresse@epfl.ch>
+ * Copyright (c) 2026, Adrien Devresse <adev@adev.name>
  *
  * Boost Software License - Version 1.0
  *
@@ -26,272 +26,225 @@
  * DEALINGS IN THE SOFTWARE.
  *
  */
-#ifndef _HADOKEN_COUNTER_ENGINE_HPP_
-#define _HADOKEN_COUNTER_ENGINE_HPP_
+#pragma once
 
-
-#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <sstream>
-#include <stdexcept>
-#include <vector>
-
-///
-/// This work is inspired of algorithm
-///  presented in the publication
-/// "Parallel random numbers: as easy as 1, 2, 3".
-///    John K. Salmon, Mark A. Moraes, Ron O. Dror, David E. Shaw" (doi:10.1145/2063384.2063405)
-///
-///  It is freely inspired of the Boost.Random123  (https://github.com/DEShawResearch/Random123-Boost )
-///  and of the original random123 package distribution
-///
-///  counter_engine offers an interface compatible with both C++11 random engine and Boost.Random
-///
-///  available cbrng backend  are : threefy
-///
-///
-///
-///
-
-
+#include <ostream>
 #include <random>
+#include <type_traits>
+
+#include "alea/threefry.hpp"
+
+//
+// This work is inspired by the algorithms presented in the publication
+//   "Parallel random numbers: as easy as 1, 2, 3".
+//     John K. Salmon, Mark A. Moraes, Ron O. Dror, David E. Shaw
+//     (doi:10.1145/2063384.2063405)
+//
+// It is freely inspired by Boost.Random123
+// (https://github.com/DEShawResearch/Random123-Boost) and by the original
+// Random123 package distribution.
+//
 
 namespace alea {
 
-template <typename CBRNG>
-class counter_engine {
-  public:
-    typedef CBRNG cbrng_type;
-    typedef typename CBRNG::domain_type ctr_type;
-    typedef typename CBRNG::key_type key_type;
-    typedef typename ctr_type::value_type result_type;
-    typedef size_t elem_type;
+/// counter_engine adapts a counter based random generator (CBRNG) into an
+/// engine satisfying the C++11 random engine requirements, and therefore
+/// usable with all the `std::` distributions.
+///
+/// The engine owns a key (the identifier of the "stream") and a counter. Two
+/// engines with different keys produce statistically independent streams, and
+/// two engines with the same key produce the same stream, whatever the thread
+/// or the process they belong to. The counter can be moved forward with
+/// `discard()`, which makes it cheap to split a stream between workers without
+/// any communication.
+///
+/// \tparam CBRNG a counter based random generator, for example `threefry4x64`
+template <typename CBRNG> class counter_engine {
+  static_assert(std::is_unsigned_v<typename CBRNG::uint_type>, "the words of a CBRNG counter must be unsigned");
 
-    
-    explicit counter_engine(const key_type& uk) : b(uk), c(), elem() {}
+public:
+  using cbrng_type = CBRNG;
+  using ctr_type = typename CBRNG::domain_type;
+  using key_type = typename CBRNG::key_type;
+  using result_type = typename ctr_type::value_type;
+  using elem_type = std::size_t;
 
-    
-    explicit counter_engine(key_type& uk) : b(uk), c(), elem() {}
+  /// construct an engine with a zeroed key and a zeroed counter
+  constexpr counter_engine() : b(), c(), elem(), v() {}
 
-    
-    explicit counter_engine() : b(), c(), elem() {}
+  /// construct an engine using the key `uk` and a zeroed counter
+  explicit constexpr counter_engine(const key_type& uk) : b(uk), c(), elem(), v() {}
 
-    
-    explicit counter_engine(result_type r) : b(), c(), elem() {
-        key_type key;
-        std::fill(key.begin(), key.end(), typename key_type::value_type(r));
-        b.set_key(key);
+  /// construct an engine with the key broadcasted from the seed `r`
+  explicit constexpr counter_engine(result_type r) : b(broadcast_key(r)), c(), elem(), v() {}
+
+  /// construct an engine with a key generated from the seed sequence `seq`
+  explicit counter_engine(std::seed_seq& seq) : b(seed_key(seq)), c(), elem(), v() {}
+
+  constexpr counter_engine(const counter_engine&) = default;
+  constexpr counter_engine(counter_engine&&) = default;
+
+  counter_engine& operator=(const counter_engine&) = default;
+  counter_engine& operator=(counter_engine&&) = default;
+
+  /// reset the engine to the default state: zeroed key and zeroed counter
+  void seed() { *this = counter_engine(); }
+
+  /// reset the engine to the key broadcasted from the seed `r`
+  void seed(result_type r) { *this = counter_engine(r); }
+
+  /// reset the engine to the key `uk`
+  void seed(const key_type& uk) { *this = counter_engine(uk); }
+
+  /// reset the engine to a key generated from the seed sequence `seq`
+  void seed(std::seed_seq& seq) {
+    b.set_key(seed_key(seq));
+    c = ctr_type();
+    elem = 0;
+    v = ctr_type();
+  }
+
+  friend bool operator==(const counter_engine& lhs, const counter_engine& rhs) {
+    return lhs.b == rhs.b && lhs.c == rhs.c && lhs.elem == rhs.elem;
+  }
+
+  friend bool operator!=(const counter_engine& lhs, const counter_engine& rhs) { return !(lhs == rhs); }
+
+  /// write the state of the engine (counter, key and number of buffered
+  /// values) to the stream `os`
+  friend std::ostream& operator<<(std::ostream& os, const counter_engine& be) {
+    for (const result_type val : be.c) {
+      os << val << ' ';
+    }
+    for (const result_type val : be.b.get_key()) {
+      os << val << ' ';
+    }
+    return os << be.elem;
+  }
+
+  /// minimum value returned by the engine
+  static constexpr result_type min() { return 0; }
+
+  /// maximum value returned by the engine
+  static constexpr result_type max() { return std::numeric_limits<result_type>::max(); }
+
+  /// return the next value of the stream
+  ///
+  /// the counter is incremented and encrypted by the CBRNG once every
+  /// `ctr_type::size()` calls, the generated block is buffered
+  result_type operator()() {
+    if (elem == 0) {
+      incr_array(c.begin(), c.end());
+      v = b(c);
+      elem = c.size();
+    }
+    elem -= 1;
+    return v[elem];
+  }
+
+  /// alias of `operator()`, kept for compatibility with legacy APIs
+  result_type generate() { return (*this)(); }
+
+  /// increment the counter and return the whole encrypted block
+  ctr_type generate_block() {
+    elem = 0;
+    incr_array(c.begin(), c.end());
+    v = b(c);
+    return v;
+  }
+
+  /// move the stream forward by `skip` values without generating them one by
+  /// one
+  void discard(std::uintmax_t skip) {
+    // the buffered values are dropped first
+    while (elem != 0 && skip > 0) {
+      skip -= 1;
+      elem -= 1;
     }
 
-    
-    explicit counter_engine(std::seed_seq& seq) : b(), c(), elem() {
-        key_type key;
+    const elem_type nelem = c.size();
+    const std::uintmax_t counter_increment = skip / nelem;
+    std::uintmax_t counter_rest = skip % nelem;
 
-        seq.generate(key.begin(), key.end());
-        b.set_key(key);
+    incr_array(c.begin(), c.end(), counter_increment);
+
+    // then consume the remaining values of the last block
+    while (counter_rest > 0) {
+      (void)(*this)();
+      counter_rest -= 1;
+    }
+  }
+
+  /// return the CBRNG encryption of the counter `counter` with the current
+  /// key, without modifying the state of the engine
+  ctr_type operator()(const ctr_type& counter) const { return b(counter); }
+
+  /// return the key of the engine, i.e. the identifier of its stream
+  key_type get_key() const { return b.get_key(); }
+
+  /// return the current counter of the engine
+  ctr_type get_counter() const { return c; }
+
+private:
+  static constexpr key_type broadcast_key(result_type r) {
+    key_type key{};
+    for (result_type& val : key) {
+      val = r;
+    }
+    return key;
+  }
+
+  static key_type seed_key(std::seed_seq& seq) {
+    key_type key{};
+    seq.generate(key.begin(), key.end());
+    return key;
+  }
+
+  // increment by one the big integer represented by the array [start, finish)
+  template <typename Iterator> static inline void incr_array(Iterator start, Iterator finish) {
+    constexpr typename cbrng_type::uint_type max_elem = std::numeric_limits<typename cbrng_type::uint_type>::max();
+
+    while (start != finish) {
+      if (*start == max_elem) {
+        *start = 0;
+        start += 1;
+      } else {
+        *start += 1;
+        break;
+      }
+    }
+  }
+
+  // increment by `inc_val` the big integer represented by [start, finish)
+  template <typename Iterator> static void incr_array(Iterator start, Iterator finish, std::uintmax_t inc_val) {
+    constexpr typename cbrng_type::uint_type max_elem = std::numeric_limits<typename cbrng_type::uint_type>::max();
+
+    if (inc_val == 0 || start == finish) {
+      return;
     }
 
+    const std::uintmax_t current_inc_val = inc_val & max_elem;
+    const std::uintmax_t next_inc_val =
+        ((sizeof(std::uintmax_t) != sizeof(typename cbrng_type::uint_type)) ? (inc_val >> (sizeof(max_elem) * 8)) : 0);
 
-    
-    counter_engine(const counter_engine&) = default;
-    
-    counter_engine(counter_engine&&) = default;
+    const typename cbrng_type::uint_type past_val = *start;
+    *start += current_inc_val;
 
-    
-    counter_engine& operator=(const counter_engine&) = default;
-    
-    counter_engine& operator=(counter_engine&&) = default;
-
-    
-    void seed(result_type r) { *this = counter_engine(r); }
-
-
-    template <typename SeedSeq>
-     void seed(SeedSeq& s) {
-        *this = counter_engine(s);
+    if (*start < past_val) { // an overflow occurred, increment the next word
+      incr_array(start + 1, finish, next_inc_val + 1);
+    } else {
+      incr_array(start + 1, finish, next_inc_val);
     }
+  }
 
-    
-    void seed() { *this = counter_engine(); }
-
-    
-    void seed(const key_type& uk) { *this = counter_engine(uk); }
-
-    
-    void seed(key_type& uk) { *this = counter_engine(uk); }
-
-    
-    friend bool operator==(const counter_engine& lhs, const counter_engine& rhs) {
-        return lhs.c == rhs.c && lhs.elem == rhs.elem && lhs.b == rhs.b;
-    }
-
-    
-    friend bool operator!=(const counter_engine& lhs, const counter_engine& rhs) {
-        return lhs.c != rhs.c || lhs.elem != rhs.elem || lhs.b != rhs.b;
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const counter_engine& be) {
-        return os << be.c << " " << be.b.getkey() << " " << be.elem;
-    }
-
-
-    const static result_type _min = 0;
-    const static result_type _max = ~((result_type)0);
-
-    
-    static constexpr result_type min() { return _min; }
-    
-    static constexpr result_type max() { return _max; }
-
-    
-    result_type operator()() {
-        if (elem == 0) {
-            incr_array(c.begin(), c.end());
-            v = b(c);
-            elem = c.size();
-        }
-        return v[--elem];
-    }
-
-
-    
-    result_type generate() { return (*this)(); }
-
-
-    
-    ctr_type generate_block() {
-        elem = 0;
-        incr_array(c.begin(), c.end());
-        return b(c);
-    }
-
-
-    
-    void discard(std::uintmax_t skip) {
-        // any buffered turn need to be dropped
-        while (elem != 0 && skip > 0) {
-            skip--;
-            elem--;
-        }
-        const size_t nelem = c.size();
-        std::uintmax_t counter_increment = skip / nelem;
-        std::uintmax_t counter_rest = skip % nelem;
-        incr_array(c.begin(), c.end(), counter_increment);
-
-        // call generator for remaining turns
-        while (counter_rest--) {
-
-            (void)(*this)();
-        }
-    }
-
-    
-    counter_engine<cbrng_type> derivate(const key_type& key) const {
-        // for counter engine, derivate need to return a unique counter
-        // from a tuple <old_counter_state, old_key, new_key>
-
-        // to achive this we rely on the block cipher properties
-        // of the counter based random generators
-        // new_key = cipher_block(key, cipher_block(old_key, old_counter_state))
-
-        counter_engine<cbrng_type> derivate_counter(*this);
-        // call the new counter with the old key and old counter value
-        // to get a value function of the counter state and the counter key
-        (void)derivate_counter();
-
-        // now we setup the new key
-        derivate_counter.b.set_key(key);
-
-        // do a simple rotation based on the elem value
-        // to take into consideration "elem" without
-        std::rotate(derivate_counter.v.begin(), derivate_counter.v.begin() + elem, derivate_counter.v.end());
-
-        // and using previous rotate generated block as element
-        key_type new_key = derivate_counter.b(derivate_counter.v);
-        // use the new key as counter
-        derivate_counter.seed(new_key);
-
-        return derivate_counter;
-    }
-
-    
-    counter_engine<cbrng_type> derivate(result_type r) const {
-        key_type key;
-        std::fill(key.begin(), key.end(), typename key_type::value_type(r));
-        return derivate(key);
-    }
-
-
-
-    
-    ctr_type operator()(const ctr_type& c) const { return b(c); }
-
-
-    
-    key_type getseed() const { return c.get_key(); }
-
-
-    
-    ctr_type getcounter() const { return c; }
-
-
-
-  private:
-    template <typename Iterator>
-     inline void incr_array(Iterator start, Iterator finish) {
-        static const typename cbrng_type::uint_type max_elem = std::numeric_limits<typename cbrng_type::uint_type>::max();
-
-        while (start != finish) {
-            if (*start == max_elem) {
-                *start = 0;
-                start++;
-            } else {
-                *start += 1;
-                break;
-            }
-        }
-    }
-
-    template <typename Iterator>
-     void incr_array(Iterator start, Iterator finish, std::uintmax_t inc_val) {
-        static const typename cbrng_type::uint_type max_elem = std::numeric_limits<typename cbrng_type::uint_type>::max();
-
-        if (inc_val == 0 || start == finish) {
-            return;
-        }
-
-        std::uintmax_t current_inc_val = inc_val & max_elem;
-        const std::uintmax_t next_inc_val =
-            ((sizeof(std::uintmax_t) != sizeof(typename cbrng_type::uint_type)) ? (inc_val >> (sizeof(max_elem) * 8)) : 0);
-
-        const typename cbrng_type::uint_type past_val = *start;
-        *start += current_inc_val;
-
-        if (*start < past_val) { // overflow occured, inc +1 next elem
-            incr_array(start + 1, finish, next_inc_val + 1);
-        } else {
-            incr_array(start + 1, finish, next_inc_val);
-        }
-    }
-
-    cbrng_type b;
-    ctr_type c;
-    elem_type elem;
-    ctr_type v;
+  cbrng_type b;
+  ctr_type c;
+  elem_type elem;
+  ctr_type v;
 };
 
-
-// specialize random_engine_derivate
-// for counter base random generator
-template <typename CBRNG>
-inline counter_engine<CBRNG> random_engine_derivate(const counter_engine<CBRNG>& engine,
-                                                    const typename counter_engine<CBRNG>::result_type& key) {
-    return engine.derivate(key);
-}
-
-
-} // namespace hadoken
-
-#endif
+} // namespace alea

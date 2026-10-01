@@ -35,34 +35,34 @@
 #include "alea/random.hpp"
 
 int main() {
-    std::size_t iterations = 1000;
-    std::uint64_t val = 0;
-    ankerl::nanobench::Bench bench;
-    
-    bench.minEpochIterations(5000).run("std::mt19937_64 ", [&] {
-        val = 0;
-        std::size_t i = 0;          
-        std::mt19937_64 engine;
-        std::uniform_int_distribution<decltype(val)> dist;
-        for(; i < iterations; ++i){
-            val+= dist(engine);
-        }
-        ankerl::nanobench::doNotOptimizeAway(val);
-        ankerl::nanobench::doNotOptimizeAway(iterations);
-        ankerl::nanobench::doNotOptimizeAway(i);                 
-    });
+  std::size_t iterations = 1000;
+  std::uint64_t val = 0;
+  ankerl::nanobench::Bench bench;
 
-    bench.minEpochIterations(25000).run("alea::threefry ", [&] {
-        val = 0;
-        std::size_t i = 0;
-    
-        alea::counter_engine<alea::threefry4x64> engine;
-        std::uniform_int_distribution<decltype(val)> dist;
-        for(; i < iterations; ++i){
-            val += dist(engine);
-        }
-        ankerl::nanobench::doNotOptimizeAway(val);
-        ankerl::nanobench::doNotOptimizeAway(iterations);
-        ankerl::nanobench::doNotOptimizeAway(i);        
-    });    
+  bench.minEpochIterations(25000).run("std::mt19937_64 ", [&] {
+    val = 0;
+    std::size_t i = 0;
+    std::mt19937_64 engine;
+    std::uniform_int_distribution<decltype(val)> dist;
+    for (; i < iterations; ++i) {
+      val += dist(engine);
+    }
+    ankerl::nanobench::doNotOptimizeAway(val);
+    ankerl::nanobench::doNotOptimizeAway(iterations);
+    ankerl::nanobench::doNotOptimizeAway(i);
+  });
+
+  bench.minEpochIterations(25000).run("alea::threefry ", [&] {
+    val = 0;
+    std::size_t i = 0;
+
+    alea::counter_engine<alea::threefry4x64> engine;
+    std::uniform_int_distribution<decltype(val)> dist;
+    for (; i < iterations; ++i) {
+      val += dist(engine);
+    }
+    ankerl::nanobench::doNotOptimizeAway(val);
+    ankerl::nanobench::doNotOptimizeAway(iterations);
+    ankerl::nanobench::doNotOptimizeAway(i);
+  });
 }

@@ -1,0 +1,24 @@
+# Build directories
+build/
+build-*/
+out/
+cmake-build-*/
+
+# go-task cache
+.task/
+
+# CMake / ninja artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+Testing/
+*.o
+*.obj
+*.a
+*.so
+
+# Editors
+.vscode/
+.idea/
+*.swp

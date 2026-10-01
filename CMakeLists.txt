@@ -1,9 +1,19 @@
 cmake_minimum_required(VERSION 3.21)
 project(ALEA VERSION 0.1.0 LANGUAGES CXX)
 
+# default to an optimized build with debug symbols when alea is built as the
+# top level project and no build type was requested: it is the user's
+# responsibility to pick another build type, for example
+# -DCMAKE_BUILD_TYPE=Debug
+if(PROJECT_IS_TOP_LEVEL AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 option(ALEA_ENABLE_TESTS "Build the alea unit tests" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_BENCH "Build the alea benchmarks" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_INSTALL "Enable the installation of the alea headers" ${PROJECT_IS_TOP_LEVEL})
+option(ENABLE_VALIDATION "Validate alea against the reference random123 implementation, fetched with FetchContent" OFF)
 
 # alea is a header only library: everything lives in include/alea
 add_library(ALEA INTERFACE)
@@ -26,6 +36,34 @@ if(ALEA_ENABLE_TESTS)
     target_link_libraries(ALEA_Test PRIVATE ALEA doctest::doctest)
 
     add_test(NAME ALEA_Test COMMAND ALEA_Test)
+
+    if(ENABLE_VALIDATION)
+        include(FetchContent)
+
+        # the reference random123 implementation is fetched at configure
+        # time, it is only used to build the validation tests and must not
+        # be installed together with alea
+        FetchContent_Declare(
+          random123
+          GIT_REPOSITORY https://github.com/DEShawResearch/random123
+          GIT_TAG v1.14.0
+          GIT_SHALLOW TRUE
+        )
+
+        # random123 is a header only library and does not ship any
+        # CMakeLists.txt: we only fetch its sources and add its include
+        # directory to the validation tests
+        FetchContent_GetProperties(random123)
+        if(NOT random123_POPULATED)
+            FetchContent_Populate(random123)
+        endif()
+
+        add_executable(ALEA_Validation tests/validation/threefry_validation.cpp)
+        target_link_libraries(ALEA_Validation PRIVATE ALEA doctest::doctest)
+        target_include_directories(ALEA_Validation PRIVATE ${random123_SOURCE_DIR}/include)
+
+        add_test(NAME ALEA_Validation COMMAND ALEA_Validation)
+    endif()
 endif()
 
 if(ALEA_ENABLE_BENCH)

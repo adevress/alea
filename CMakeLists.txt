@@ -1,4 +1,12 @@
-cmake_minimum_required(VERSION 3.21)
+# CMake 3.28 is the version shipped with Ubuntu 24.04 LTS (cmake 3.28.3),
+# the lowest supported baseline.
+cmake_minimum_required(VERSION 3.28)
+
+# alea uses no C++20 modules: disable the clang module dependency scan that
+# CMake >= 3.28 otherwise runs on every translation unit with the Ninja
+# generator. It is not only unnecessary, it is also broken with toolchain
+# wrappers that pass include dirs through the environment (e.g. Nix).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF CACHE BOOL "Disable C++20 module dependency scanning" OFF)
 project(ALEA VERSION 0.1.0 LANGUAGES CXX)
 
 # default to an optimized build with debug symbols when alea is built as the
@@ -63,11 +71,11 @@ if(ALEA_ENABLE_TESTS)
             FetchContent_Populate(random123)
         endif()
 
-        add_executable(ALEA_Validation tests/validation/threefry_validation.cpp)
-        target_link_libraries(ALEA_Validation PRIVATE ALEA doctest::doctest)
-        target_include_directories(ALEA_Validation PRIVATE ${random123_SOURCE_DIR}/include)
+        add_executable(ALEA_Threefry_Validation tests/validation/threefry_validation.cpp)
+        target_link_libraries(ALEA_Threefry_Validation PRIVATE ALEA doctest::doctest)
+        target_include_directories(ALEA_Threefry_Validation PRIVATE ${random123_SOURCE_DIR}/include)
 
-        add_test(NAME ALEA_Validation COMMAND ALEA_Validation)
+        add_test(NAME ALEA_Threefry_Validation COMMAND ALEA_Threefry_Validation)
 
         add_executable(ALEA_Philox_Validation tests/validation/philox_validation.cpp)
         target_link_libraries(ALEA_Philox_Validation PRIVATE ALEA doctest::doctest)

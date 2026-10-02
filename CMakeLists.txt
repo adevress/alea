@@ -11,8 +11,8 @@ if(PROJECT_IS_TOP_LEVEL AND NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(ALEA_ENABLE_TESTS "Build the alea unit tests" ${PROJECT_IS_TOP_LEVEL})
-option(ALEA_ENABLE_BENCH "Build the alea benchmarks" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_INSTALL "Enable the installation of the alea headers" ${PROJECT_IS_TOP_LEVEL})
+option(ENABLE_BENCH "Build the alea benchmarks, nanobench is fetched with FetchContent" ${PROJECT_IS_TOP_LEVEL})
 option(ENABLE_VALIDATION "Validate alea against the reference random123 implementation, fetched with FetchContent" OFF)
 
 # alea is a header only library: everything lives in include/alea
@@ -36,6 +36,11 @@ if(ALEA_ENABLE_TESTS)
     target_link_libraries(ALEA_Test PRIVATE ALEA doctest::doctest)
 
     add_test(NAME ALEA_Test COMMAND ALEA_Test)
+
+    add_executable(ALEA_Philox_Test tests/philox_test.cpp)
+    target_link_libraries(ALEA_Philox_Test PRIVATE ALEA doctest::doctest)
+
+    add_test(NAME ALEA_Philox_Test COMMAND ALEA_Philox_Test)
 
     if(ENABLE_VALIDATION)
         include(FetchContent)
@@ -63,12 +68,53 @@ if(ALEA_ENABLE_TESTS)
         target_include_directories(ALEA_Validation PRIVATE ${random123_SOURCE_DIR}/include)
 
         add_test(NAME ALEA_Validation COMMAND ALEA_Validation)
+
+        add_executable(ALEA_Philox_Validation tests/validation/philox_validation.cpp)
+        target_link_libraries(ALEA_Philox_Validation PRIVATE ALEA doctest::doctest)
+        target_include_directories(ALEA_Philox_Validation PRIVATE ${random123_SOURCE_DIR}/include)
+
+        add_test(NAME ALEA_Philox_Validation COMMAND ALEA_Philox_Validation)
+
+        # the fast 64 bit philox multiply relies on a double width integer
+        # type. When the platform provides one, the portable fallback is
+        # validated as well through an additional translation unit compiled
+        # with ALEA_PHILOX_DISABLE_INT128, against the same reference
+        include(CheckCXXSourceCompiles)
+        check_cxx_source_compiles(
+          "
+#if !defined(__SIZEOF_INT128__)
+#error the compiler does not provide a 128 bit integer type
+#endif
+int main() { return 0; }
+"
+          ALEA_HAVE_INT128)
+
+        if(ALEA_HAVE_INT128)
+            add_executable(ALEA_Philox_Fallback_Validation tests/validation/philox_fallback_validation.cpp)
+            target_link_libraries(ALEA_Philox_Fallback_Validation PRIVATE ALEA doctest::doctest)
+            target_include_directories(ALEA_Philox_Fallback_Validation PRIVATE ${random123_SOURCE_DIR}/include)
+            target_compile_definitions(ALEA_Philox_Fallback_Validation PRIVATE ALEA_PHILOX_DISABLE_INT128)
+
+            add_test(NAME ALEA_Philox_Fallback_Validation COMMAND ALEA_Philox_Fallback_Validation)
+        endif()
     endif()
 endif()
 
-if(ALEA_ENABLE_BENCH)
-    # nanobench as a submodule
-    add_subdirectory(third_party/nanobench)
+if(ENABLE_BENCH)
+    include(FetchContent)
+
+    # nanobench is fetched at configure time, it is only used to build the
+    # benchmarks and must not be installed together with alea
+    FetchContent_Declare(
+      nanobench
+      GIT_REPOSITORY https://github.com/martinus/nanobench.git
+      GIT_TAG v4.6.0
+      GIT_SHALLOW TRUE
+    )
+
+    # nanobench only defines its targets when it is pulled in with
+    # add_subdirectory, which is exactly what FetchContent_MakeAvailable does
+    FetchContent_MakeAvailable(nanobench)
 
     add_executable(ALEA_Bench bench/alea_nano.cpp)
     target_link_libraries(ALEA_Bench PRIVATE ALEA nanobench::nanobench)

@@ -33,4 +33,5 @@
 //
 
 #include "alea/counter_engine.hpp"
+#include "alea/philox.hpp"
 #include "alea/threefry.hpp"

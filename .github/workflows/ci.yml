@@ -1,0 +1,80 @@
+# Continuous integration for alea
+#
+# Every dependency comes from Nix (default.nix in the repo root: a pinned
+# upstream nixpkgs, no flakes). Each job builds the package derivation for
+# the platform/compiler pair with `nix-build`; the derivation's check phase
+# runs the tests through CTest inside the sandbox. The compiler is selected
+# by the exposed package attribute:
+#   GCC:   alea                (unit tests)
+#          aleaWithValidation  (unit + validation tests)
+#   clang: aleaClang
+#          aleaWithValidationClang
+#
+# Runner labels:
+#   ubuntu-latest      -> Ubuntu 24.04, x86_64
+#   ubuntu-24.04-arm   -> Ubuntu 24.04, aarch64 (GitHub-hosted arm64 runner)
+
+name: ci
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: "${{ matrix.arch }} / ${{ matrix.compiler }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest       # x86_64
+            arch: x86_64
+            compiler: gcc
+            unit: alea
+            validation: aleaWithValidation
+          - os: ubuntu-latest       # x86_64
+            arch: x86_64
+            compiler: clang
+            unit: aleaClang
+            validation: aleaWithValidationClang
+          - os: ubuntu-24.04-arm    # aarch64
+            arch: aarch64
+            compiler: gcc
+            unit: alea
+            validation: aleaWithValidation
+          - os: ubuntu-24.04-arm    # aarch64
+            arch: aarch64
+            compiler: clang
+            unit: aleaClang
+            validation: aleaWithValidationClang
+
+    steps:
+      # The submodules are declared with ssh URLs; redirect every
+      # github.com fetch to https so checkout needs no ssh key.
+      - name: Fetch github.com over https
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Build with ${{ matrix.compiler }} (unit tests)
+        run: nix-build default.nix -A ${{ matrix.unit }}
+
+      - name: Build with ${{ matrix.compiler }} (unit + validation tests)
+        run: nix-build default.nix -A ${{ matrix.validation }}

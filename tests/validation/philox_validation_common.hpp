@@ -43,7 +43,7 @@
 //
 // Helpers shared by the philox validation translation units. The reference
 // random123 implementation is fetched at configure time with FetchContent when
-// -DENABLE_VALIDATION=ON.
+// -DALEA_ENABLE_VALIDATION=ON.
 //
 // Every check draws its random inputs from a mersenne twister correctly
 // initialized from the seed of the unit test framework (doctest --rand-seed,

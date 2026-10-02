@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 3.28)
 # generator. It is not only unnecessary, it is also broken with toolchain
 # wrappers that pass include dirs through the environment (e.g. Nix).
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF CACHE BOOL "Disable C++20 module dependency scanning" OFF)
+
 project(ALEA VERSION 0.1.0 LANGUAGES CXX)
 
 # default to an optimized build with debug symbols when alea is built as the
@@ -19,9 +20,9 @@ if(PROJECT_IS_TOP_LEVEL AND NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(ALEA_ENABLE_TESTS "Build the alea unit tests" ${PROJECT_IS_TOP_LEVEL})
-option(ALEA_ENABLE_INSTALL "Enable the installation of the alea headers" ${PROJECT_IS_TOP_LEVEL})
-option(ENABLE_BENCH "Build the alea benchmarks, nanobench is fetched with FetchContent" ${PROJECT_IS_TOP_LEVEL})
-option(ENABLE_VALIDATION "Validate alea against the reference random123 implementation, fetched with FetchContent" OFF)
+option(ALEA_ENABLE_INSTALL "Install the alea headers" ${PROJECT_IS_TOP_LEVEL})
+option(ALEA_ENABLE_BENCH "Build the alea benchmarks (nanobench submodule)" ${PROJECT_IS_TOP_LEVEL})
+option(ALEA_ENABLE_VALIDATION "Validate alea against the reference random123 implementation, fetched with FetchContent" OFF)
 
 # alea is a header only library: everything lives in include/alea
 add_library(ALEA INTERFACE)
@@ -35,53 +36,45 @@ if(ALEA_ENABLE_TESTS)
     enable_testing()
 
     # doctest as a submodule, only used to build the tests: it must not be
-    # installed together with alea
+    # installed together with alea. Its own test suite is already skipped
+    # because doctest is added as a subproject (MAIN_PROJECT is false).
     set(DOCTEST_NO_INSTALL ON CACHE BOOL "" FORCE)
-    set(DOCTEST_WITH_TESTS OFF CACHE BOOL "" FORCE)
     add_subdirectory(third_party/doctest)
 
     add_executable(ALEA_Test tests/threefry_test.cpp)
     target_link_libraries(ALEA_Test PRIVATE ALEA doctest::doctest)
-
     add_test(NAME ALEA_Test COMMAND ALEA_Test)
 
     add_executable(ALEA_Philox_Test tests/philox_test.cpp)
     target_link_libraries(ALEA_Philox_Test PRIVATE ALEA doctest::doctest)
-
     add_test(NAME ALEA_Philox_Test COMMAND ALEA_Philox_Test)
 
-    if(ENABLE_VALIDATION)
+    if(ALEA_ENABLE_VALIDATION)
         include(FetchContent)
 
-        # the reference random123 implementation is fetched at configure
-        # time, it is only used to build the validation tests and must not
-        # be installed together with alea
+        # the reference random123 implementation is fetched at configure time,
+        # it is only used to build the validation tests and must not be
+        # installed together with alea. random123 is header only and ships no
+        # CMakeLists.txt: FetchContent_MakeAvailable only populates it and
+        # exposes random123_SOURCE_DIR, which is all we need.
         FetchContent_Declare(
           random123
           GIT_REPOSITORY https://github.com/DEShawResearch/random123
           GIT_TAG v1.14.0
           GIT_SHALLOW TRUE
         )
+        FetchContent_MakeAvailable(random123)
 
-        # random123 is a header only library and does not ship any
-        # CMakeLists.txt: we only fetch its sources and add its include
-        # directory to the validation tests
-        FetchContent_GetProperties(random123)
-        if(NOT random123_POPULATED)
-            FetchContent_Populate(random123)
-        endif()
+        # small helper to add one validation test against random123
+        function(alea_add_validation_test name source)
+            add_executable(${name} ${source})
+            target_link_libraries(${name} PRIVATE ALEA doctest::doctest)
+            target_include_directories(${name} PRIVATE ${random123_SOURCE_DIR}/include)
+            add_test(NAME ${name} COMMAND ${name})
+        endfunction()
 
-        add_executable(ALEA_Threefry_Validation tests/validation/threefry_validation.cpp)
-        target_link_libraries(ALEA_Threefry_Validation PRIVATE ALEA doctest::doctest)
-        target_include_directories(ALEA_Threefry_Validation PRIVATE ${random123_SOURCE_DIR}/include)
-
-        add_test(NAME ALEA_Threefry_Validation COMMAND ALEA_Threefry_Validation)
-
-        add_executable(ALEA_Philox_Validation tests/validation/philox_validation.cpp)
-        target_link_libraries(ALEA_Philox_Validation PRIVATE ALEA doctest::doctest)
-        target_include_directories(ALEA_Philox_Validation PRIVATE ${random123_SOURCE_DIR}/include)
-
-        add_test(NAME ALEA_Philox_Validation COMMAND ALEA_Philox_Validation)
+        alea_add_validation_test(ALEA_Threefry_Validation tests/validation/threefry_validation.cpp)
+        alea_add_validation_test(ALEA_Philox_Validation tests/validation/philox_validation.cpp)
 
         # the fast 64 bit philox multiply relies on a double width integer
         # type. When the platform provides one, the portable fallback is
@@ -98,31 +91,17 @@ int main() { return 0; }
           ALEA_HAVE_INT128)
 
         if(ALEA_HAVE_INT128)
-            add_executable(ALEA_Philox_Fallback_Validation tests/validation/philox_fallback_validation.cpp)
-            target_link_libraries(ALEA_Philox_Fallback_Validation PRIVATE ALEA doctest::doctest)
-            target_include_directories(ALEA_Philox_Fallback_Validation PRIVATE ${random123_SOURCE_DIR}/include)
+            alea_add_validation_test(ALEA_Philox_Fallback_Validation tests/validation/philox_fallback_validation.cpp)
             target_compile_definitions(ALEA_Philox_Fallback_Validation PRIVATE ALEA_PHILOX_DISABLE_INT128)
-
-            add_test(NAME ALEA_Philox_Fallback_Validation COMMAND ALEA_Philox_Fallback_Validation)
         endif()
     endif()
 endif()
 
-if(ENABLE_BENCH)
-    include(FetchContent)
-
-    # nanobench is fetched at configure time, it is only used to build the
-    # benchmarks and must not be installed together with alea
-    FetchContent_Declare(
-      nanobench
-      GIT_REPOSITORY https://github.com/martinus/nanobench.git
-      GIT_TAG v4.6.0
-      GIT_SHALLOW TRUE
-    )
-
-    # nanobench only defines its targets when it is pulled in with
-    # add_subdirectory, which is exactly what FetchContent_MakeAvailable does
-    FetchContent_MakeAvailable(nanobench)
+if(ALEA_ENABLE_BENCH)
+    # nanobench as a submodule, only used to build the benchmarks: it must not
+    # be installed together with alea and, as a subproject, it does not build
+    # its own test suite.
+    add_subdirectory(third_party/nanobench)
 
     add_executable(ALEA_Bench bench/alea_nano.cpp)
     target_link_libraries(ALEA_Bench PRIVATE ALEA nanobench::nanobench)

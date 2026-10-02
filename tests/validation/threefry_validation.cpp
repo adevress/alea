@@ -43,7 +43,7 @@
 //
 // Validation of the alea threefry generators against the reference random123
 // implementation (https://github.com/DEShawResearch/random123), fetched at
-// configure time with FetchContent when -DENABLE_VALIDATION=ON.
+// configure time with FetchContent when -DALEA_ENABLE_VALIDATION=ON.
 //
 // Every test draws its random inputs from a mersenne twister correctly
 // initialized from the seed of the unit test framework (doctest --rand-seed,

@@ -1,6 +1,6 @@
 
 ## Code style instructions
-- Use '//' comment style and '///' for documentations
+- Use '//' comment style and '///' for documentation
 - Use `pragma once` instead of include guards
 - Respect the existing namespace hierarchy
 - never use `using namespace` in C++
@@ -21,4 +21,10 @@
 - Run `task format` (it uses the `.clang-format` file at the root of the repository)
 - Run `task format-check` to verify the formatting without modifying the files
 
+## Restrictions
 
+Respect these rules:
+ - Never write or rewrite git history without the explicit and direct demand of the user. That also concerns commit, push, and rebase.
+ - If you do need a tool or a library, try to use Nix. Do not install things without Nix without the explicit demand of the user.
+
+For the previous restrictions. Always ask a question if you doubt.

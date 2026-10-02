@@ -1,5 +1,7 @@
 # Alea - Modern RNGs without compromise
 
+[![CI](https://github.com/adevress/alea/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/adevress/alea/actions/workflows/ci.yml)
+
 Alea is a collection of Pseudo Random Generator in Modern C++ designed to be used in scientific codebases and in places where determinism and high quality of random streams matters.
 
 # Why ? 

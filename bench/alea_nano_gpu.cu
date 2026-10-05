@@ -206,4 +206,7 @@ int main() {
   bench_nvidia_philox(config, work, "Nvidia philox/10    ");
   bench_generator<alea::philox2x64>(config, work, "alea::philox2x64/10  ");
   bench_generator<alea::philox4x64>(config, work, "alea::philox4x64/10  ");
+
+  bench_generator<alea::ars4x32>(config, work, "alea::ars4x32/7      ");
+  bench_generator<alea::ars<10>>(config, work, "alea::ars4x32/10     ");
 }

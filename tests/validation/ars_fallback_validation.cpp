@@ -26,13 +26,37 @@
  * DEALINGS IN THE SOFTWARE.
  *
  */
-#pragma once
+
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "ars_validation_common.hpp"
 
 //
-// umbrella header of the random generators of alea
+// Validation of the portable software implementation used by ars when the
+// platform does not provide the AES instructions, or when
+// ALEA_ARS_DISABLE_HW is defined.
+//
+// This translation unit is compiled with ALEA_ARS_DISABLE_HW so that the
+// software implementation replaces the hardware one even on a platform that
+// supports the AES instructions. It is checked against the official Random123
+// known answers on every platform and, when the reference AES-NI
+// implementation is available, against `r123::ARS4x32_R` block by block.
 //
 
-#include "alea/ars.hpp"
-#include "alea/counter_engine.hpp"
-#include "alea/philox.hpp"
-#include "alea/threefry.hpp"
+namespace av = alea::test::ars_validation;
+
+TEST_CASE("ars fallback official Random123 known answers") { av::run_kat_validation(); }
+
+#if R123_USE_AES_NI
+
+TEST_CASE_TEMPLATE("ars fallback blocks are bit to bit identical to the reference random123", AleaCbrng, alea::ars<5>,
+                   alea::ars<7>, alea::ars<10>) {
+  using ref_type = r123::ARS4x32_R<AleaCbrng::number_of_rounds>;
+  av::run_random_block_validation<AleaCbrng, ref_type>();
+}
+
+TEST_CASE_TEMPLATE("counter_engine ars fallback streams are bit to bit identical to the reference random123", Cbrng,
+                   alea::ars<5>, alea::ars<7>, alea::ars<10>) {
+  av::run_counter_engine_stream_validation<Cbrng>();
+}
+
+#endif

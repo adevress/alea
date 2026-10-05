@@ -26,13 +26,33 @@
  * DEALINGS IN THE SOFTWARE.
  *
  */
-#pragma once
+
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "ars_validation_common.hpp"
 
 //
-// umbrella header of the random generators of alea
+// Validation of the alea ars generators against the reference random123
+// implementation. This translation unit exercises the instruction set selected
+// for the build: the AES-NI path when the compiler was allowed to emit it, the
+// portable fallback otherwise. The fallback is additionally validated on its
+// own by the ars_fallback_validation.cpp translation unit.
 //
 
-#include "alea/ars.hpp"
-#include "alea/counter_engine.hpp"
-#include "alea/philox.hpp"
-#include "alea/threefry.hpp"
+namespace av = alea::test::ars_validation;
+
+TEST_CASE("ars official Random123 known answers") { av::run_kat_validation(); }
+
+#if R123_USE_AES_NI
+
+TEST_CASE_TEMPLATE("ars blocks are bit to bit identical to the reference random123", AleaCbrng, alea::ars<5>,
+                   alea::ars<7>, alea::ars<10>) {
+  using ref_type = r123::ARS4x32_R<AleaCbrng::number_of_rounds>;
+  av::run_random_block_validation<AleaCbrng, ref_type>();
+}
+
+TEST_CASE_TEMPLATE("counter_engine ars streams are bit to bit identical to the reference random123", Cbrng,
+                   alea::ars<5>, alea::ars<7>, alea::ars<10>) {
+  av::run_counter_engine_stream_validation<Cbrng>();
+}
+
+#endif

@@ -14,9 +14,15 @@ To know more please refer to the Random123 initial publication.
 
 Alea provides an optimised, modern and tested implementation of these RNGs.
 
+Alea ports the three CBRNG families introduced by Random123:
+
+- `threefry`, based on the Threefish block cipher;
+- `philox`, based on a Feistel network and wide integer multiplication;
+- `ars`, based on the AES round function with a simplified Weyl key schedule.
+
 # GPU / CUDA
 
-Alea is single source: the very same `threefry`, `philox` and
+Alea is single source: the very same `threefry`, `philox`, `ars` and
 `counter_engine` headers are callable from CUDA kernels, without any code
 duplication. The execution space annotations live in
 `alea/gpu_portability.hpp` and expand to nothing under a plain C++ compiler.
@@ -37,5 +43,8 @@ machine (`CMAKE_CUDA_ARCHITECTURES=native`); pass
 `-DCMAKE_CUDA_ARCHITECTURES=...` to target other devices.
 
 # References
+
+The reference implementation and its known answer test vectors are available
+at [https://github.com/DEShawResearch/random123](https://github.com/DEShawResearch/random123).
 
 [^1]: Random123, "Parallel random numbers: as easy as 1, 2, 3.", [https://doi.org/10.1145/2063384.2063405](https://doi.org/10.1145/2063384.2063405)

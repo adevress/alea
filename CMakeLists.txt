@@ -58,6 +58,65 @@ if(ALEA_ENABLE_CUDA)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
+# ARS is built on the AES round function: on x86 the AES-NI instructions, on
+# AArch64 the Cryptography Extensions. The headers select the optimized
+# implementation from the predefined compiler macros (__AES__ and
+# __ARM_FEATURE_AES), but the compiler must first be told that the target
+# supports the instructions. The tests and the benchmarks turn them on when
+# the build machine is actually able to execute them, so that both the
+# optimized path and the portable fallback are exercised.
+if(ALEA_ENABLE_TESTS OR ALEA_ENABLE_BENCH)
+    include(CheckCXXSourceRuns)
+
+    set(ALEA_AES_ARCH_OPTION "")
+
+    set(CMAKE_REQUIRED_FLAGS "-maes")
+    check_cxx_source_runs(
+      "
+#include <wmmintrin.h>
+int main() {
+  __m128i a = _mm_setzero_si128();
+  a = _mm_aesenc_si128(a, a);
+  volatile int x = _mm_cvtsi128_si32(a);
+  (void)x;
+  return 0;
+}
+"
+      ALEA_HAVE_AESNI)
+
+    if(ALEA_HAVE_AESNI)
+        set(ALEA_AES_ARCH_OPTION "-maes")
+    else()
+        set(CMAKE_REQUIRED_FLAGS "-march=armv8-a+crypto")
+        check_cxx_source_runs(
+          "
+#include <arm_neon.h>
+int main() {
+  uint8x16_t a = vdupq_n_u8(0);
+  a = vaeseq_u8(a, a);
+  volatile unsigned char x = vgetq_lane_u8(a, 0);
+  (void)x;
+  return 0;
+}
+"
+          ALEA_HAVE_ARM_CRYPTO)
+
+        if(ALEA_HAVE_ARM_CRYPTO)
+            set(ALEA_AES_ARCH_OPTION "-march=armv8-a+crypto")
+        endif()
+    endif()
+
+    unset(CMAKE_REQUIRED_FLAGS)
+
+    # interface target that enables the AES instructions for the targets that
+    # exercise the optimized ARS path; it carries no flag on a platform
+    # without a usable AES instruction set
+    add_library(ALEA_AES_ARCH INTERFACE)
+    if(ALEA_AES_ARCH_OPTION)
+        target_compile_options(ALEA_AES_ARCH INTERFACE ${ALEA_AES_ARCH_OPTION})
+    endif()
+endif()
+
 if(ALEA_ENABLE_TESTS)
     enable_testing()
 
@@ -74,6 +133,10 @@ if(ALEA_ENABLE_TESTS)
     add_executable(ALEA_Philox_Test tests/philox_test.cpp)
     target_link_libraries(ALEA_Philox_Test PRIVATE ALEA doctest::doctest)
     add_test(NAME ALEA_Philox_Test COMMAND ALEA_Philox_Test)
+
+    add_executable(ALEA_Ars_Test tests/ars_test.cpp)
+    target_link_libraries(ALEA_Ars_Test PRIVATE ALEA doctest::doctest ALEA_AES_ARCH)
+    add_test(NAME ALEA_Ars_Test COMMAND ALEA_Ars_Test)
 
     if(ALEA_ENABLE_CUDA)
         add_executable(ALEA_GPU_Test tests/gpu/gpu_test.cu)
@@ -108,6 +171,20 @@ if(ALEA_ENABLE_TESTS)
         alea_add_validation_test(ALEA_Threefry_Validation tests/validation/threefry_validation.cpp)
         alea_add_validation_test(ALEA_Philox_Validation tests/validation/philox_validation.cpp)
 
+        # the ARS validation relies on the official Random123 known answers on
+        # every platform, and on a direct comparison with r123::ARS4x32_R
+        # when the reference implementation can use AES-NI. The AES
+        # instructions are enabled for these targets so that both the
+        # optimized path and the fallback are validated against the reference
+        alea_add_validation_test(ALEA_Ars_Validation tests/validation/ars_validation.cpp)
+        target_link_libraries(ALEA_Ars_Validation PRIVATE ALEA_AES_ARCH)
+
+        # the portable software fallback is validated on its own through an
+        # additional translation unit compiled with ALEA_ARS_DISABLE_HW
+        alea_add_validation_test(ALEA_Ars_Fallback_Validation tests/validation/ars_fallback_validation.cpp)
+        target_link_libraries(ALEA_Ars_Fallback_Validation PRIVATE ALEA_AES_ARCH)
+        target_compile_definitions(ALEA_Ars_Fallback_Validation PRIVATE ALEA_ARS_DISABLE_HW)
+
         # the fast 64 bit philox multiply relies on a double width integer
         # type. When the platform provides one, the portable fallback is
         # validated as well through an additional translation unit compiled
@@ -136,7 +213,7 @@ if(ALEA_ENABLE_BENCH)
     add_subdirectory(third_party/nanobench)
 
     add_executable(ALEA_Bench bench/alea_nano.cpp)
-    target_link_libraries(ALEA_Bench PRIVATE ALEA nanobench::nanobench)
+    target_link_libraries(ALEA_Bench PRIVATE ALEA nanobench::nanobench ALEA_AES_ARCH)
 
     if(ALEA_ENABLE_CUDA)
         add_executable(ALEA_GPU_Bench bench/alea_nano_gpu.cu)

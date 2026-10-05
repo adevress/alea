@@ -47,6 +47,10 @@ using threefry4x32_8 = threefry<4, std::uint32_t, 8>;
 using threefry2x64_8 = threefry<2, std::uint64_t, 8>;
 using threefry4x64_8 = threefry<4, std::uint64_t, 8>;
 
+// ARS is a single 128 bit block generator: the reference ars4x32 uses 7
+// rounds, the KAT vectors of the reference use 10. Both are benchmarked
+using ars4x32_10 = ars<10>;
+
 } // namespace alea
 
 namespace {
@@ -183,6 +187,9 @@ int main() {
     add_raw_bench<alea::counter_engine<alea::philox4x32>>(bench, "alea::philox4x32/10  ");
     add_raw_bench<alea::counter_engine<alea::philox2x64>>(bench, "alea::philox2x64/10  ");
     add_raw_bench<alea::counter_engine<alea::philox4x64>>(bench, "alea::philox4x64/10  ");
+
+    add_raw_bench<alea::counter_engine<alea::ars4x32>>(bench, "alea::ars4x32/7   ");
+    add_raw_bench<alea::counter_engine<alea::ars4x32_10>>(bench, "alea::ars4x32/10  ");
   }
 
   // the STL uniform distribution path, the typical way a generator is
@@ -210,6 +217,9 @@ int main() {
     add_uniform_bench<alea::counter_engine<alea::philox4x32>>(bench, "alea::philox4x32/10  ");
     add_uniform_bench<alea::counter_engine<alea::philox2x64>>(bench, "alea::philox2x64/10  ");
     add_uniform_bench<alea::counter_engine<alea::philox4x64>>(bench, "alea::philox4x64/10  ");
+
+    add_uniform_bench<alea::counter_engine<alea::ars4x32>>(bench, "alea::ars4x32/7   ");
+    add_uniform_bench<alea::counter_engine<alea::ars4x32_10>>(bench, "alea::ars4x32/10  ");
   }
 
   // gaussian draws: the standard normal distribution, the work horse of
@@ -235,6 +245,9 @@ int main() {
     add_gaussian_bench<alea::counter_engine<alea::philox4x32>>(bench, "alea::philox4x32/10  ");
     add_gaussian_bench<alea::counter_engine<alea::philox2x64>>(bench, "alea::philox2x64/10  ");
     add_gaussian_bench<alea::counter_engine<alea::philox4x64>>(bench, "alea::philox4x64/10  ");
+
+    add_gaussian_bench<alea::counter_engine<alea::ars4x32>>(bench, "alea::ars4x32/7   ");
+    add_gaussian_bench<alea::counter_engine<alea::ars4x32_10>>(bench, "alea::ars4x32/10  ");
   }
 
   // whole block usage of the counter engines, only possible with the
@@ -256,5 +269,8 @@ int main() {
     add_block_bench<alea::philox4x32>(bench, "alea::philox4x32/10  ");
     add_block_bench<alea::philox2x64>(bench, "alea::philox2x64/10  ");
     add_block_bench<alea::philox4x64>(bench, "alea::philox4x64/10  ");
+
+    add_block_bench<alea::ars4x32>(bench, "alea::ars4x32/7   ");
+    add_block_bench<alea::ars4x32_10>(bench, "alea::ars4x32/10  ");
   }
 }

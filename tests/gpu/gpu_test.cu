@@ -85,6 +85,14 @@ launch_config large_config() {
   return config;
 }
 
+/// a launch configuration for the ARS generators
+///
+/// ARS relies on the software AES round on the device, which needs around 120
+/// registers per thread: launching the maximum number of threads per block
+/// would exceed the register file. A smaller block size with more blocks keeps
+/// the same total number of threads (about one million).
+launch_config software_aes_config() { return launch_config{4096u, 256u}; }
+
 /// deterministic key derived from a linear index, reproducible on host and device
 template <typename CBRNG> ALEA_HOST_DEVICE typename CBRNG::key_type make_key(std::uint64_t seed) {
   typename CBRNG::key_type key{};
@@ -151,8 +159,7 @@ __global__ void golden_kernel(const typename CBRNG::key_type key, const typename
 }
 
 /// check that a full grid of device generated blocks matches the host reference
-template <typename CBRNG> void check_cipher_matches_host() {
-  const launch_config config = large_config();
+template <typename CBRNG> void check_cipher_matches_host(launch_config config = large_config()) {
   const std::size_t count = static_cast<std::size_t>(config.blocks) * config.threads;
 
   typename CBRNG::range_type* device_out = nullptr;
@@ -184,8 +191,7 @@ template <typename CBRNG> void check_cipher_matches_host() {
 }
 
 /// check that a full grid of device run counter_engine matches the host reference
-template <typename CBRNG> void check_engine_matches_host(unsigned draws) {
-  const launch_config config = large_config();
+template <typename CBRNG> void check_engine_matches_host(unsigned draws, launch_config config = large_config()) {
   const std::size_t count = static_cast<std::size_t>(config.blocks) * config.threads;
 
   typename CBRNG::uint_type* device_out = nullptr;
@@ -290,5 +296,29 @@ TEST_CASE("philox runs on the GPU") {
     check_engine_matches_host<alea::philox4x32>(4);
     check_engine_matches_host<alea::philox2x64>(4);
     check_engine_matches_host<alea::philox4x64>(4);
+  }
+}
+
+TEST_CASE("ars runs on the GPU") {
+  SUBCASE("golden values") {
+    const std::vector<unsigned long long> block =
+        run_golden<alea::ars4x32>(alea::ars4x32::key_type{}, alea::ars4x32::domain_type{1, 2, 3, 4});
+    CHECK_EQ(block.size(), std::size_t{4});
+    CHECK_EQ(block[0], 0xb427c7f2ULL);
+    CHECK_EQ(block[1], 0xee4ef3dfULL);
+    CHECK_EQ(block[2], 0x66d36578ULL);
+    CHECK_EQ(block[3], 0x268d303eULL);
+  }
+
+  SUBCASE("full grid matches the host, every round count") {
+    check_cipher_matches_host<alea::ars<5>>(software_aes_config());
+    check_cipher_matches_host<alea::ars<7>>(software_aes_config());
+    check_cipher_matches_host<alea::ars<10>>(software_aes_config());
+  }
+
+  SUBCASE("counter_engine runs on the device") {
+    check_engine_matches_host<alea::ars<5>>(4, software_aes_config());
+    check_engine_matches_host<alea::ars<7>>(4, software_aes_config());
+    check_engine_matches_host<alea::ars<10>>(4, software_aes_config());
   }
 }

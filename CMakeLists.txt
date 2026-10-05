@@ -23,6 +23,8 @@ option(ALEA_ENABLE_TESTS "Build the alea unit tests" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_INSTALL "Install the alea headers" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_BENCH "Build the alea benchmarks (nanobench submodule)" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_VALIDATION "Validate alea against the reference random123 implementation, fetched with FetchContent" OFF)
+option(ALEA_ENABLE_VALIDATION_BLAKE2 "Validate alea against the reference BLAKE2 implementation, fetched with FetchContent" OFF)
+option(ALEA_ENABLE_VALIDATION_SHA256 "Validate alea against a reference SHA-256 implementation, fetched with FetchContent" OFF)
 option(ALEA_ENABLE_CUDA "Build the alea CUDA tests and benchmarks" OFF)
 
 # alea is a header only library: everything lives in include/alea
@@ -138,6 +140,14 @@ if(ALEA_ENABLE_TESTS)
     target_link_libraries(ALEA_Ars_Test PRIVATE ALEA doctest::doctest ALEA_AES_ARCH)
     add_test(NAME ALEA_Ars_Test COMMAND ALEA_Ars_Test)
 
+    add_executable(ALEA_Blake2_Test tests/blake2_test.cpp)
+    target_link_libraries(ALEA_Blake2_Test PRIVATE ALEA doctest::doctest)
+    add_test(NAME ALEA_Blake2_Test COMMAND ALEA_Blake2_Test)
+
+    add_executable(ALEA_Sha256_Test tests/sha256_test.cpp)
+    target_link_libraries(ALEA_Sha256_Test PRIVATE ALEA doctest::doctest)
+    add_test(NAME ALEA_Sha256_Test COMMAND ALEA_Sha256_Test)
+
     if(ALEA_ENABLE_CUDA)
         add_executable(ALEA_GPU_Test tests/gpu/gpu_test.cu)
         target_link_libraries(ALEA_GPU_Test PRIVATE ALEA doctest::doctest)
@@ -206,6 +216,70 @@ int main() { return 0; }
     endif()
 endif()
 
+if(ALEA_ENABLE_TESTS AND ALEA_ENABLE_VALIDATION_BLAKE2)
+    include(FetchContent)
+
+    # the reference BLAKE2 implementation is fetched at configure time, it is
+    # only used to build the validation test and must not be installed
+    # together with alea. The commit is pinned: the BLAKE2 repository has no
+    # tags newer than 2019 and its HEAD moved after the last release.
+    FetchContent_Declare(
+      blake2
+      GIT_REPOSITORY https://github.com/BLAKE2/BLAKE2
+      GIT_TAG ed1974ea83433eba7b2d95c5dcd9ac33cb847913
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(blake2)
+
+    # the reference sources are C files compiled as C for the validation
+    # executable. Both carry a main() selftest, so the two entry points are
+    # renamed on the command line of these two files only, and the C sources
+    # are put in their own static library so that the rename never touches
+    # the C++ test
+    enable_language(C)
+
+    add_library(alea_blake2_reference STATIC ${blake2_SOURCE_DIR}/ref/blake2b-ref.c
+                                              ${blake2_SOURCE_DIR}/ref/blake2s-ref.c)
+    target_include_directories(alea_blake2_reference PUBLIC ${blake2_SOURCE_DIR}/ref)
+    target_compile_options(alea_blake2_reference PRIVATE -w)
+    set_source_files_properties(${blake2_SOURCE_DIR}/ref/blake2b-ref.c PROPERTIES COMPILE_DEFINITIONS
+                                                                                       "main=blake2b_reference_main")
+    set_source_files_properties(${blake2_SOURCE_DIR}/ref/blake2s-ref.c PROPERTIES COMPILE_DEFINITIONS
+                                                                                       "main=blake2s_reference_main")
+
+    add_executable(ALEA_Blake2_Validation tests/validation/blake2_validation.cpp)
+    target_link_libraries(ALEA_Blake2_Validation PRIVATE ALEA doctest::doctest alea_blake2_reference)
+    add_test(NAME ALEA_Blake2_Validation COMMAND ALEA_Blake2_Validation)
+endif()
+
+if(ALEA_ENABLE_TESTS AND ALEA_ENABLE_VALIDATION_SHA256)
+    include(FetchContent)
+
+    # a reference SHA-256 implementation is fetched at configure time, it is
+    # only used to build the validation test and must not be installed
+    # together with alea. The classic pedagogical implementation of Brad
+    # Conte, in wide use as a reference for FIPS 180-4, is pinned to its
+    # latest commit.
+    FetchContent_Declare(
+      crypto-algorithms
+      GIT_REPOSITORY https://github.com/B-Con/crypto-algorithms
+      GIT_TAG cfbde48414baacf51fc7c74f275190881f037d32
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(crypto-algorithms)
+
+    # the reference source is a C file compiled as C for the validation
+    # executable
+    enable_language(C)
+
+    add_executable(ALEA_Sha256_Validation tests/validation/sha256_validation.cpp
+                                          ${crypto-algorithms_SOURCE_DIR}/sha256.c)
+    target_include_directories(ALEA_Sha256_Validation PRIVATE ${crypto-algorithms_SOURCE_DIR})
+    target_compile_options(ALEA_Sha256_Validation PRIVATE -w)
+    target_link_libraries(ALEA_Sha256_Validation PRIVATE ALEA doctest::doctest)
+    add_test(NAME ALEA_Sha256_Validation COMMAND ALEA_Sha256_Validation)
+endif()
+
 if(ALEA_ENABLE_BENCH)
     # nanobench as a submodule, only used to build the benchmarks: it must not
     # be installed together with alea and, as a subproject, it does not build
@@ -214,6 +288,9 @@ if(ALEA_ENABLE_BENCH)
 
     add_executable(ALEA_Bench bench/alea_nano.cpp)
     target_link_libraries(ALEA_Bench PRIVATE ALEA nanobench::nanobench ALEA_AES_ARCH)
+
+    add_executable(ALEA_Hash_Bench bench/alea_hash.cpp)
+    target_link_libraries(ALEA_Hash_Bench PRIVATE ALEA nanobench::nanobench)
 
     if(ALEA_ENABLE_CUDA)
         add_executable(ALEA_GPU_Bench bench/alea_nano_gpu.cu)

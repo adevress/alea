@@ -59,6 +59,7 @@ tasks:
       - build
     cmds:
       - ./{{.BUILD_DIR}}/ALEA_Bench
+      - ./{{.BUILD_DIR}}/ALEA_Hash_Bench
 
   clean:
     desc: remove the build directories

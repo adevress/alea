@@ -37,6 +37,7 @@
 #include <type_traits>
 
 #include "alea/gpu_portability.hpp"
+#include "alea/random_concepts.hpp"
 #include "alea/threefry.hpp"
 
 //
@@ -63,9 +64,9 @@ namespace alea {
 /// `discard()`, which makes it cheap to split a stream between workers without
 /// any communication.
 ///
-/// \tparam CBRNG a counter based random generator, for example `threefry4x64`
-template <typename CBRNG> class counter_engine {
-  static_assert(std::is_unsigned_v<typename CBRNG::uint_type>, "the words of a CBRNG counter must be unsigned");
+/// \tparam CBRNG a counter based random generator satisfying `alea::cbrng`,
+///              for example `threefry4x64`
+template <cbrng CBRNG> class counter_engine {
 
 public:
   using cbrng_type = CBRNG;

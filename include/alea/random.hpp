@@ -35,4 +35,5 @@
 #include "alea/ars.hpp"
 #include "alea/counter_engine.hpp"
 #include "alea/philox.hpp"
+#include "alea/random_concepts.hpp"
 #include "alea/threefry.hpp"

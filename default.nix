@@ -61,7 +61,7 @@ let
           # tests and the benchmarks.
           filter = path: type:
             pkgs.lib.cleanSourceFilter path type
-            && !(builtins.elem (baseNameOf path) [ "build" "build-agent" "build-agent-san" ]);
+            && !(builtins.elem (baseNameOf path) [ "build" "build-agent" "build-agent-san" "build-agent-cuda" ]);
         };
 
         # the cmake setup hook selects ninja as the generator automatically.

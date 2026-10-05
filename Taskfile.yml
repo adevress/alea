@@ -17,20 +17,21 @@ tasks:
     sources:
       - '**/*.hpp'
       - '**/*.cpp'
+      - '**/*.cu'
       - .clang-format
     excludes:
       - third_party/**
       - build/**
       - 'build-*/**'
     cmds:
-      - git ls-files -z '*.hpp' '*.cpp' | xargs -0 -r {{.CLANG_FORMAT}} -i --style=file
-      - git ls-files --others --exclude-standard -z '*.hpp' '*.cpp' | xargs -r -0 {{.CLANG_FORMAT}} -i --style=file
+      - git ls-files -z '*.hpp' '*.cpp' '*.cu' | xargs -0 -r {{.CLANG_FORMAT}} -i --style=file
+      - git ls-files --others --exclude-standard -z '*.hpp' '*.cpp' '*.cu' | xargs -r -0 {{.CLANG_FORMAT}} -i --style=file
 
   format-check:
     desc: check the formatting of the C++ sources without modifying them
     cmds:
-      - git ls-files -z '*.hpp' '*.cpp' | xargs -0 -r {{.CLANG_FORMAT}} -n --Werror --style=file
-      - git ls-files --others --exclude-standard -z '*.hpp' '*.cpp' | xargs -r -0 {{.CLANG_FORMAT}} -n
+      - git ls-files -z '*.hpp' '*.cpp' '*.cu' | xargs -0 -r {{.CLANG_FORMAT}} -n --Werror --style=file
+      - git ls-files --others --exclude-standard -z '*.hpp' '*.cpp' '*.cu' | xargs -r -0 {{.CLANG_FORMAT}} -n
         --Werror --style=file
 
   configure:

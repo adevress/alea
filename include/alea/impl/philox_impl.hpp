@@ -34,6 +34,8 @@
 #include <limits>
 #include <type_traits>
 
+#include "alea/gpu_portability.hpp"
+
 //
 // Internal details of the philox counter based random generator.
 // This header is not meant to be included directly, include <alea/philox.hpp>
@@ -69,7 +71,7 @@ template <> struct wide_uint<std::uint64_t> {
 // the compiler recognizes the double width multiplication and reduces it to a
 // single `mul` (32 bits) or `mulq` (64 bits) instruction on the supported
 // architectures, which is the whole point of the philox round
-template <typename Uint> constexpr Uint mulhilo(Uint a, Uint b, Uint& hi) {
+template <typename Uint> ALEA_HOST_DEVICE constexpr Uint mulhilo(Uint a, Uint b, Uint& hi) {
   using wide_type = typename wide_uint<Uint>::type;
   constexpr unsigned word_bits = std::numeric_limits<Uint>::digits;
 
@@ -82,7 +84,7 @@ template <typename Uint> constexpr Uint mulhilo(Uint a, Uint b, Uint& hi) {
 
 // portable fallback for the platforms that do not provide a double width
 // integer type: the product is reconstructed from four half word products
-template <typename Uint> constexpr Uint mulhilo(Uint a, Uint b, Uint& hi) {
+template <typename Uint> ALEA_HOST_DEVICE constexpr Uint mulhilo(Uint a, Uint b, Uint& hi) {
   constexpr unsigned half_bits = std::numeric_limits<Uint>::digits / 2;
   constexpr Uint low_mask = (static_cast<Uint>(1) << half_bits) - 1;
 
@@ -117,36 +119,44 @@ template <unsigned N, typename Uint> struct philox_constants {};
 
 // 2x32 constants
 template <> struct philox_constants<2, std::uint32_t> {
-  static constexpr std::uint32_t multipliers([[maybe_unused]] std::size_t pos) { return UINT32_C(0xD256D193); }
+  static ALEA_HOST_DEVICE constexpr std::uint32_t multipliers([[maybe_unused]] std::size_t pos) {
+    return UINT32_C(0xD256D193);
+  }
 
-  static constexpr std::uint32_t weyl([[maybe_unused]] std::size_t pos) { return UINT32_C(0x9E3779B9); }
+  static ALEA_HOST_DEVICE constexpr std::uint32_t weyl([[maybe_unused]] std::size_t pos) {
+    return UINT32_C(0x9E3779B9);
+  }
 };
 
 // 4x32 constants
 template <> struct philox_constants<4, std::uint32_t> {
-  static constexpr std::uint32_t multipliers(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr std::uint32_t multipliers(std::size_t pos) {
     return pos == 0 ? UINT32_C(0xD2511F53) : UINT32_C(0xCD9E8D57);
   }
 
-  static constexpr std::uint32_t weyl(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr std::uint32_t weyl(std::size_t pos) {
     return pos == 0 ? UINT32_C(0x9E3779B9) : UINT32_C(0xBB67AE85);
   }
 };
 
 // 2x64 constants
 template <> struct philox_constants<2, std::uint64_t> {
-  static constexpr std::uint64_t multipliers([[maybe_unused]] std::size_t pos) { return UINT64_C(0xD2B74407B1CE6E93); }
+  static ALEA_HOST_DEVICE constexpr std::uint64_t multipliers([[maybe_unused]] std::size_t pos) {
+    return UINT64_C(0xD2B74407B1CE6E93);
+  }
 
-  static constexpr std::uint64_t weyl([[maybe_unused]] std::size_t pos) { return UINT64_C(0x9E3779B97F4A7C15); }
+  static ALEA_HOST_DEVICE constexpr std::uint64_t weyl([[maybe_unused]] std::size_t pos) {
+    return UINT64_C(0x9E3779B97F4A7C15);
+  }
 };
 
 // 4x64 constants
 template <> struct philox_constants<4, std::uint64_t> {
-  static constexpr std::uint64_t multipliers(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr std::uint64_t multipliers(std::size_t pos) {
     return pos == 0 ? UINT64_C(0xD2E7470EE14C6C93) : UINT64_C(0xCA5A826395121157);
   }
 
-  static constexpr std::uint64_t weyl(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr std::uint64_t weyl(std::size_t pos) {
     return pos == 0 ? UINT64_C(0x9E3779B97F4A7C15) : UINT64_C(0xBB67AE8584CAA73B);
   }
 };
@@ -165,7 +175,7 @@ template <> struct philox_constants<4, std::uint64_t> {
 // The same code covers the N == 2 and N == 4 variants: for N == 2 the pair
 // permutation is the identity and the round degenerates to the usual 2xW one.
 template <typename Uint, typename Constants, std::size_t N>
-constexpr void philox_round(std::array<Uint, N>& c, std::array<Uint, N / 2>& key) {
+ALEA_HOST_DEVICE constexpr void philox_round(std::array<Uint, N>& c, std::array<Uint, N / 2>& key) {
   constexpr std::size_t half = N / 2;
 
   std::array<Uint, N> out{};
@@ -190,14 +200,14 @@ constexpr void philox_round(std::array<Uint, N>& c, std::array<Uint, N / 2>& key
 // used for threefry: it avoids the loop overhead and lets the compiler
 // schedule the independent multiplications of every round.
 template <std::size_t r_remain, typename Uint, typename Constants, std::size_t N> struct philox_rounds_functor {
-  constexpr void operator()(std::array<Uint, N>& c, std::array<Uint, N / 2>& key) const {
+  ALEA_HOST_DEVICE constexpr void operator()(std::array<Uint, N>& c, std::array<Uint, N / 2>& key) const {
     philox_round<Uint, Constants, N>(c, key);
     philox_rounds_functor<r_remain - 1, Uint, Constants, N>{}(c, key);
   }
 };
 
 template <typename Uint, typename Constants, std::size_t N> struct philox_rounds_functor<0, Uint, Constants, N> {
-  constexpr void operator()(std::array<Uint, N>& c, std::array<Uint, N / 2>& key) const {
+  ALEA_HOST_DEVICE constexpr void operator()(std::array<Uint, N>& c, std::array<Uint, N / 2>& key) const {
     (void)c;
     (void)key;
   }

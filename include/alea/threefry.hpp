@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "alea/gpu_portability.hpp"
 #include "alea/impl/threefry_impl.hpp"
 
 //
@@ -72,10 +73,10 @@ public:
   static constexpr unsigned number_of_rounds = R;
 
   /// construct a generator with a key set to zero
-  constexpr threefry() : k() {}
+  ALEA_HOST_DEVICE constexpr threefry() : k() {}
 
   /// construct a generator with the key `new_key`
-  explicit constexpr threefry(key_type new_key) : k(new_key) {}
+  ALEA_HOST_DEVICE explicit constexpr threefry(key_type new_key) : k(new_key) {}
 
   constexpr threefry(const threefry&) = default;
   constexpr threefry(threefry&&) = default;
@@ -84,20 +85,20 @@ public:
   threefry& operator=(threefry&&) = default;
 
   /// set the key of the generator
-  void set_key(key_type new_key) { k = new_key; }
+  ALEA_HOST_DEVICE void set_key(key_type new_key) { k = new_key; }
 
   /// get the key of the generator
-  key_type get_key() const { return k; }
+  ALEA_HOST_DEVICE key_type get_key() const { return k; }
 
-  bool operator==(const threefry& rhs) const { return k == rhs.k; }
+  ALEA_HOST_DEVICE bool operator==(const threefry& rhs) const { return k == rhs.k; }
 
-  bool operator!=(const threefry& rhs) const { return k != rhs.k; }
+  ALEA_HOST_DEVICE bool operator!=(const threefry& rhs) const { return k != rhs.k; }
 
   /// encrypt the counter `counter` with the current key of the generator
   ///
   /// the operation is stateless: the same (key, counter) pair always produces
   /// the same block, whatever the number of times and the order of the calls.
-  constexpr range_type operator()(const domain_type& counter) const {
+  ALEA_HOST_DEVICE constexpr range_type operator()(const domain_type& counter) const {
     std::array<uint_type, N + 1> ks{};
     domain_type c(counter);
 

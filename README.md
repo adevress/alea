@@ -14,6 +14,28 @@ To know more please refer to the Random123 initial publication.
 
 Alea provides an optimised, modern and tested implementation of these RNGs.
 
+# GPU / CUDA
+
+Alea is single source: the very same `threefry`, `philox` and
+`counter_engine` headers are callable from CUDA kernels, without any code
+duplication. The execution space annotations live in
+`alea/gpu_portability.hpp` and expand to nothing under a plain C++ compiler.
+
+Build the GPU unit tests and benchmarks with:
+
+```sh
+cmake -G Ninja -DALEA_ENABLE_CUDA=ON -DALEA_ENABLE_BENCH=ON ..
+ninja
+ctest -V            # runs ALEA_GPU_Test
+./ALEA_GPU_Bench    # GPU throughput
+```
+
+The GPU tests and benchmarks launch 1024 blocks of the maximum number of
+threads per block (about one million threads) and compare every device result
+with the host reference. `ALEA_ENABLE_CUDA` compiles for the GPU of the build
+machine (`CMAKE_CUDA_ARCHITECTURES=native`); pass
+`-DCMAKE_CUDA_ARCHITECTURES=...` to target other devices.
+
 # References
 
 [^1]: Random123, "Parallel random numbers: as easy as 1, 2, 3.", [https://doi.org/10.1145/2063384.2063405](https://doi.org/10.1145/2063384.2063405)

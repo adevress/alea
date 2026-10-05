@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "alea/gpu_portability.hpp"
 #include "alea/impl/philox_impl.hpp"
 
 //
@@ -76,10 +77,10 @@ public:
   static constexpr unsigned number_of_rounds = R;
 
   /// construct a generator with a key set to zero
-  constexpr philox() : k() {}
+  ALEA_HOST_DEVICE constexpr philox() : k() {}
 
   /// construct a generator with the key `new_key`
-  explicit constexpr philox(key_type new_key) : k(new_key) {}
+  ALEA_HOST_DEVICE explicit constexpr philox(key_type new_key) : k(new_key) {}
 
   constexpr philox(const philox&) = default;
   constexpr philox(philox&&) = default;
@@ -88,20 +89,20 @@ public:
   philox& operator=(philox&&) = default;
 
   /// set the key of the generator
-  void set_key(key_type new_key) { k = new_key; }
+  ALEA_HOST_DEVICE void set_key(key_type new_key) { k = new_key; }
 
   /// get the key of the generator
-  key_type get_key() const { return k; }
+  ALEA_HOST_DEVICE key_type get_key() const { return k; }
 
-  bool operator==(const philox& rhs) const { return k == rhs.k; }
+  ALEA_HOST_DEVICE bool operator==(const philox& rhs) const { return k == rhs.k; }
 
-  bool operator!=(const philox& rhs) const { return k != rhs.k; }
+  ALEA_HOST_DEVICE bool operator!=(const philox& rhs) const { return k != rhs.k; }
 
   /// encrypt the counter `counter` with the current key of the generator
   ///
   /// the operation is stateless: the same (key, counter) pair always produces
   /// the same block, whatever the number of times and the order of the calls.
-  constexpr range_type operator()(const domain_type& counter) const {
+  ALEA_HOST_DEVICE constexpr range_type operator()(const domain_type& counter) const {
     domain_type c(counter);
     key_type kcopy(k);
 

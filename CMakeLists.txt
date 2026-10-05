@@ -23,6 +23,7 @@ option(ALEA_ENABLE_TESTS "Build the alea unit tests" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_INSTALL "Install the alea headers" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_BENCH "Build the alea benchmarks (nanobench submodule)" ${PROJECT_IS_TOP_LEVEL})
 option(ALEA_ENABLE_VALIDATION "Validate alea against the reference random123 implementation, fetched with FetchContent" OFF)
+option(ALEA_ENABLE_CUDA "Build the alea CUDA tests and benchmarks" OFF)
 
 # alea is a header only library: everything lives in include/alea
 add_library(ALEA INTERFACE)
@@ -31,6 +32,31 @@ add_library(alea::alea ALIAS ALEA)
 target_include_directories(ALEA INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                                          $<INSTALL_INTERFACE:include>)
 target_compile_features(ALEA INTERFACE cxx_std_20)
+
+# alea uses std::array and std::numeric_limits, which are constexpr but host
+# only: nvcc needs relaxed constexpr to call them from device code. The flag
+# is attached to the interface target so that it reaches every CUDA consumer
+# of alea, whether or not the alea GPU targets themselves are enabled.
+target_compile_options(ALEA INTERFACE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+
+if(ALEA_ENABLE_CUDA)
+    # when the architectures are not specified, compile for the GPU of the
+    # build machine so that the tests can run; override with
+    # -DCMAKE_CUDA_ARCHITECTURES=... to target other devices. This must be
+    # set before enable_language(CUDA), which otherwise pins the nvcc default.
+    if(NOT CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES native CACHE STRING "CUDA architectures to build for" FORCE)
+        set_property(CACHE CMAKE_CUDA_ARCHITECTURES PROPERTY STRINGS native)
+    endif()
+
+    # the same headers are compiled by nvcc: enable the CUDA language and
+    # propagate the flags the single source implementation needs to every
+    # consumer of the ALEA interface target
+    enable_language(CUDA)
+
+    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+endif()
 
 if(ALEA_ENABLE_TESTS)
     enable_testing()
@@ -48,6 +74,12 @@ if(ALEA_ENABLE_TESTS)
     add_executable(ALEA_Philox_Test tests/philox_test.cpp)
     target_link_libraries(ALEA_Philox_Test PRIVATE ALEA doctest::doctest)
     add_test(NAME ALEA_Philox_Test COMMAND ALEA_Philox_Test)
+
+    if(ALEA_ENABLE_CUDA)
+        add_executable(ALEA_GPU_Test tests/gpu/gpu_test.cu)
+        target_link_libraries(ALEA_GPU_Test PRIVATE ALEA doctest::doctest)
+        add_test(NAME ALEA_GPU_Test COMMAND ALEA_GPU_Test)
+    endif()
 
     if(ALEA_ENABLE_VALIDATION)
         include(FetchContent)
@@ -105,6 +137,11 @@ if(ALEA_ENABLE_BENCH)
 
     add_executable(ALEA_Bench bench/alea_nano.cpp)
     target_link_libraries(ALEA_Bench PRIVATE ALEA nanobench::nanobench)
+
+    if(ALEA_ENABLE_CUDA)
+        add_executable(ALEA_GPU_Bench bench/alea_nano_gpu.cu)
+        target_link_libraries(ALEA_GPU_Bench PRIVATE ALEA nanobench::nanobench)
+    endif()
 endif()
 
 if(ALEA_ENABLE_INSTALL)

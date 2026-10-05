@@ -36,6 +36,7 @@
 #include <random>
 #include <type_traits>
 
+#include "alea/gpu_portability.hpp"
 #include "alea/threefry.hpp"
 
 //
@@ -74,13 +75,13 @@ public:
   using elem_type = std::size_t;
 
   /// construct an engine with a zeroed key and a zeroed counter
-  constexpr counter_engine() : b(), c(), elem(), v() {}
+  ALEA_HOST_DEVICE constexpr counter_engine() : b(), c(), elem(), v() {}
 
   /// construct an engine using the key `uk` and a zeroed counter
-  explicit constexpr counter_engine(const key_type& uk) : b(uk), c(), elem(), v() {}
+  ALEA_HOST_DEVICE explicit constexpr counter_engine(const key_type& uk) : b(uk), c(), elem(), v() {}
 
   /// construct an engine with the key broadcasted from the seed `r`
-  explicit constexpr counter_engine(result_type r) : b(broadcast_key(r)), c(), elem(), v() {}
+  ALEA_HOST_DEVICE explicit constexpr counter_engine(result_type r) : b(broadcast_key(r)), c(), elem(), v() {}
 
   /// construct an engine with a key generated from the seed sequence `seq`
   explicit counter_engine(std::seed_seq& seq) : b(seed_key(seq)), c(), elem(), v() {}
@@ -92,13 +93,13 @@ public:
   counter_engine& operator=(counter_engine&&) = default;
 
   /// reset the engine to the default state: zeroed key and zeroed counter
-  void seed() { *this = counter_engine(); }
+  ALEA_HOST_DEVICE void seed() { *this = counter_engine(); }
 
   /// reset the engine to the key broadcasted from the seed `r`
-  void seed(result_type r) { *this = counter_engine(r); }
+  ALEA_HOST_DEVICE void seed(result_type r) { *this = counter_engine(r); }
 
   /// reset the engine to the key `uk`
-  void seed(const key_type& uk) { *this = counter_engine(uk); }
+  ALEA_HOST_DEVICE void seed(const key_type& uk) { *this = counter_engine(uk); }
 
   /// reset the engine to a key generated from the seed sequence `seq`
   void seed(std::seed_seq& seq) {
@@ -108,11 +109,13 @@ public:
     v = ctr_type();
   }
 
-  friend bool operator==(const counter_engine& lhs, const counter_engine& rhs) {
+  ALEA_HOST_DEVICE friend bool operator==(const counter_engine& lhs, const counter_engine& rhs) {
     return lhs.b == rhs.b && lhs.c == rhs.c && lhs.elem == rhs.elem;
   }
 
-  friend bool operator!=(const counter_engine& lhs, const counter_engine& rhs) { return !(lhs == rhs); }
+  ALEA_HOST_DEVICE friend bool operator!=(const counter_engine& lhs, const counter_engine& rhs) {
+    return !(lhs == rhs);
+  }
 
   /// write the state of the engine (counter, key and number of buffered
   /// values) to the stream `os`
@@ -127,16 +130,16 @@ public:
   }
 
   /// minimum value returned by the engine
-  static constexpr result_type min() { return 0; }
+  static ALEA_HOST_DEVICE constexpr result_type min() { return 0; }
 
   /// maximum value returned by the engine
-  static constexpr result_type max() { return std::numeric_limits<result_type>::max(); }
+  static ALEA_HOST_DEVICE constexpr result_type max() { return std::numeric_limits<result_type>::max(); }
 
   /// return the next value of the stream
   ///
   /// the counter is incremented and encrypted by the CBRNG once every
   /// `ctr_type::size()` calls, the generated block is buffered
-  result_type operator()() {
+  ALEA_HOST_DEVICE result_type operator()() {
     if (elem == 0) {
       incr_array(c.begin(), c.end());
       v = b(c);
@@ -147,10 +150,10 @@ public:
   }
 
   /// alias of `operator()`, kept for compatibility with legacy APIs
-  result_type generate() { return (*this)(); }
+  ALEA_HOST_DEVICE result_type generate() { return (*this)(); }
 
   /// increment the counter and return the whole encrypted block
-  ctr_type generate_block() {
+  ALEA_HOST_DEVICE ctr_type generate_block() {
     elem = 0;
     incr_array(c.begin(), c.end());
     v = b(c);
@@ -159,7 +162,7 @@ public:
 
   /// move the stream forward by `skip` values without generating them one by
   /// one
-  void discard(std::uintmax_t skip) {
+  ALEA_HOST_DEVICE void discard(std::uintmax_t skip) {
     // the buffered values are dropped first
     while (elem != 0 && skip > 0) {
       skip -= 1;
@@ -181,16 +184,16 @@ public:
 
   /// return the CBRNG encryption of the counter `counter` with the current
   /// key, without modifying the state of the engine
-  ctr_type operator()(const ctr_type& counter) const { return b(counter); }
+  ALEA_HOST_DEVICE ctr_type operator()(const ctr_type& counter) const { return b(counter); }
 
   /// return the key of the engine, i.e. the identifier of its stream
-  key_type get_key() const { return b.get_key(); }
+  ALEA_HOST_DEVICE key_type get_key() const { return b.get_key(); }
 
   /// return the current counter of the engine
-  ctr_type get_counter() const { return c; }
+  ALEA_HOST_DEVICE ctr_type get_counter() const { return c; }
 
 private:
-  static constexpr key_type broadcast_key(result_type r) {
+  static ALEA_HOST_DEVICE constexpr key_type broadcast_key(result_type r) {
     key_type key{};
     for (result_type& val : key) {
       val = r;
@@ -205,7 +208,7 @@ private:
   }
 
   // increment by one the big integer represented by the array [start, finish)
-  template <typename Iterator> static inline void incr_array(Iterator start, Iterator finish) {
+  template <typename Iterator> static ALEA_HOST_DEVICE inline void incr_array(Iterator start, Iterator finish) {
     constexpr typename cbrng_type::uint_type max_elem = std::numeric_limits<typename cbrng_type::uint_type>::max();
 
     while (start != finish) {
@@ -220,7 +223,8 @@ private:
   }
 
   // increment by `inc_val` the big integer represented by [start, finish)
-  template <typename Iterator> static void incr_array(Iterator start, Iterator finish, std::uintmax_t inc_val) {
+  template <typename Iterator>
+  static ALEA_HOST_DEVICE void incr_array(Iterator start, Iterator finish, std::uintmax_t inc_val) {
     constexpr typename cbrng_type::uint_type max_elem = std::numeric_limits<typename cbrng_type::uint_type>::max();
 
     if (inc_val == 0 || start == finish) {

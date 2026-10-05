@@ -33,6 +33,8 @@
 #include <cstdint>
 #include <limits>
 
+#include "alea/gpu_portability.hpp"
+
 //
 // Internal details of the threefry counter based random generator.
 // This header is not meant to be included directly, include <alea/threefry.hpp>
@@ -56,9 +58,9 @@ template <unsigned N, typename Uint> struct threefry_constants {};
 
 // 2x32 constants
 template <> struct threefry_constants<2, std::uint32_t> {
-  static constexpr std::uint32_t ks_parity() { return UINT32_C(0x1BD11BDA); }
+  static ALEA_HOST_DEVICE constexpr std::uint32_t ks_parity() { return UINT32_C(0x1BD11BDA); }
 
-  static constexpr unsigned rotations(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr unsigned rotations(std::size_t pos) {
     constexpr unsigned rotation_table[8] = {13, 15, 26, 6, 17, 29, 16, 24};
     return rotation_table[pos];
   }
@@ -66,14 +68,14 @@ template <> struct threefry_constants<2, std::uint32_t> {
 
 // 4x32 constants
 template <> struct threefry_constants<4, std::uint32_t> {
-  static constexpr std::uint32_t ks_parity() { return UINT32_C(0x1BD11BDA); }
+  static ALEA_HOST_DEVICE constexpr std::uint32_t ks_parity() { return UINT32_C(0x1BD11BDA); }
 
-  static constexpr unsigned rotations0(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr unsigned rotations0(std::size_t pos) {
     constexpr unsigned rotation_table[8] = {10, 11, 13, 23, 6, 17, 25, 18};
     return rotation_table[pos];
   }
 
-  static constexpr unsigned rotations1(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr unsigned rotations1(std::size_t pos) {
     constexpr unsigned rotation_table[8] = {26, 21, 27, 5, 20, 11, 10, 20};
     return rotation_table[pos];
   }
@@ -81,9 +83,9 @@ template <> struct threefry_constants<4, std::uint32_t> {
 
 // 2x64 constants
 template <> struct threefry_constants<2, std::uint64_t> {
-  static constexpr std::uint64_t ks_parity() { return UINT64_C(0x1BD11BDAA9FC1A22); }
+  static ALEA_HOST_DEVICE constexpr std::uint64_t ks_parity() { return UINT64_C(0x1BD11BDAA9FC1A22); }
 
-  static constexpr unsigned rotations(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr unsigned rotations(std::size_t pos) {
     constexpr unsigned rotation_table[8] = {16, 42, 12, 31, 16, 32, 24, 21};
     return rotation_table[pos];
   }
@@ -91,20 +93,20 @@ template <> struct threefry_constants<2, std::uint64_t> {
 
 // 4x64 constants
 template <> struct threefry_constants<4, std::uint64_t> {
-  static constexpr std::uint64_t ks_parity() { return UINT64_C(0x1BD11BDAA9FC1A22); }
+  static ALEA_HOST_DEVICE constexpr std::uint64_t ks_parity() { return UINT64_C(0x1BD11BDAA9FC1A22); }
 
-  static constexpr unsigned rotations0(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr unsigned rotations0(std::size_t pos) {
     constexpr unsigned rotation_table[8] = {14, 52, 23, 5, 25, 46, 58, 32};
     return rotation_table[pos];
   }
 
-  static constexpr unsigned rotations1(std::size_t pos) {
+  static ALEA_HOST_DEVICE constexpr unsigned rotations1(std::size_t pos) {
     constexpr unsigned rotation_table[8] = {16, 57, 40, 37, 33, 12, 22, 32};
     return rotation_table[pos];
   }
 };
 
-template <typename Uint> constexpr Uint threefry_rotl(Uint x, unsigned s) {
+template <typename Uint> ALEA_HOST_DEVICE constexpr Uint threefry_rotl(Uint x, unsigned s) {
   return (x << s) | (x >> (std::numeric_limits<Uint>::digits - s));
 }
 
@@ -125,7 +127,7 @@ struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 4> {
   using uint_type = Uint;
   using domain_type = Domain;
 
-  constexpr void operator()(const std::array<uint_type, 5>& ks, domain_type& c) const {
+  ALEA_HOST_DEVICE constexpr void operator()(const std::array<uint_type, 5>& ks, domain_type& c) const {
     constexpr std::size_t r = r_max - r_remain;
 
     if ((r & 0x01)) {
@@ -161,7 +163,7 @@ struct rounds_functor<0, r_max, Uint, Domain, Constants, 4> {
   using uint_type = Uint;
   using domain_type = Domain;
 
-  constexpr void operator()(const std::array<uint_type, 5>& ks, domain_type& c) const {
+  ALEA_HOST_DEVICE constexpr void operator()(const std::array<uint_type, 5>& ks, domain_type& c) const {
     (void)ks;
     (void)c;
   }
@@ -172,7 +174,7 @@ struct rounds_functor<r_remain, r_max, Uint, Domain, Constants, 2> {
   using uint_type = Uint;
   using domain_type = Domain;
 
-  constexpr void operator()(const std::array<uint_type, 3>& ks, domain_type& c) const {
+  ALEA_HOST_DEVICE constexpr void operator()(const std::array<uint_type, 3>& ks, domain_type& c) const {
     constexpr std::size_t r = r_max - r_remain;
 
     c[0] += c[1];
@@ -198,7 +200,7 @@ struct rounds_functor<0, r_max, Uint, Domain, Constants, 2> {
   using uint_type = Uint;
   using domain_type = Domain;
 
-  constexpr void operator()(const std::array<uint_type, 3>& ks, domain_type& c) const {
+  ALEA_HOST_DEVICE constexpr void operator()(const std::array<uint_type, 3>& ks, domain_type& c) const {
     (void)ks;
     (void)c;
   }
